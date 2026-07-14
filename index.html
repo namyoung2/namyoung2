@@ -1,0 +1,2362 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>수집가들 — 좋은 문장은 다시 찾아옵니다</title>
+<link rel="stylesheet" as="style" crossorigin
+  href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.css" />
+<style>
+  :root{
+    --bg: #FFFFFF;
+    --surface: #FCFCFC;
+    --text: #181818;
+    --text-secondary: #666666;
+    --text-tertiary: #A0A0A0;
+    --border: #ECECEC;
+    --accent: #2B2B2B;
+    --hover: #F5F5F5;
+    --danger: #B23A2E;
+    --danger-soft: #F5E6E4;
+  }
+  *{ box-sizing: border-box; }
+  html,body{
+    margin:0; padding:0;
+    width: 100%;
+    max-width: 100%;
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'Pretendard', -apple-system, BlinkMacSystemFont, "Segoe UI", "Apple SD Gothic Neo", sans-serif;
+    min-height: 100vh;
+    font-size: 15px;
+    -webkit-font-smoothing: antialiased;
+    overflow-x: clip;
+  }
+  .wrap{
+    width: 100%;
+    max-width: 720px;
+    margin: 0 auto;
+    padding: 56px 24px 140px;
+    overflow-x: clip;
+  }
+
+
+  /* ── 단일 책 Hero ─────────────────────────── */
+  .book-hero{
+    width: 100%;
+    max-width: 100%;
+    margin-bottom: 8px;
+    overflow-x: clip;
+  }
+  .hero-nav{
+    position: relative;
+    width: 100%;
+    max-width: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    overflow-x: clip;
+  }
+
+  /* PC(마우스)에서만 hover 시 아주 옅게 나타나는 좌우 화살표. 터치 기기에서는 아예 표시되지 않음 */
+  .hero-side-arrow{
+    display: none;
+    position: absolute;
+    top: 100px;
+    width: 34px; height: 34px;
+    border-radius: 50%;
+    border: none;
+    background: var(--surface);
+    color: var(--text-tertiary);
+    font-size: 15px;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    opacity: 0;
+    z-index: 5;
+    transition: opacity 0.15s ease, background 0.15s ease;
+  }
+  .hero-side-arrow.left{ left: 10px; }
+  .hero-side-arrow.right{ right: 10px; }
+  .hero-side-arrow.hidden{ display: none !important; }
+  @media (hover: hover) and (pointer: fine){
+    .hero-side-arrow{ display: flex; }
+    .hero-nav:hover .hero-side-arrow{ opacity: 0.5; }
+    .hero-side-arrow:hover{ opacity: 1 !important; background: var(--hover); }
+  }
+
+
+  .hero-dots{
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    align-items: center;
+    gap: 6px;
+    margin-top: 16px;
+  }
+  .hero-dot{
+    width: 5px; height: 5px;
+    border-radius: 50%;
+    background: var(--border);
+    transition: background 0.15s ease, transform 0.15s ease;
+  }
+  .hero-dot.active{
+    background: var(--text-secondary);
+    transform: scale(1.4);
+  }
+
+  .hero-book{
+    flex-shrink: 0;
+    width: 240px;
+    text-align: center;
+    touch-action: pan-y;
+    user-select: none;
+    cursor: grab;
+    animation: heroFade 0.2s ease both;
+  }
+  .hero-book:active{ cursor: grabbing; }
+  .hero-book.dir-next{ animation: heroSlideFromRight 0.2s ease both; }
+  .hero-book.dir-prev{ animation: heroSlideFromLeft 0.2s ease both; }
+  /* 바깥 wrap은 항상 고정 크기 유지 → Hero 전체 레이아웃(제목·저자·Dot 위치)이
+     책마다 절대 흔들리지 않음. 그림자(::before)도 이 고정 크기 기준이라 안정적임. */
+  .hero-cover-wrap{
+    position: relative;
+    width: 180px;
+    margin: 0 auto 20px;
+    animation: heroFloat 7s ease-in-out infinite;
+    overflow: visible;
+  }
+  .hero-cover-wrap::before{
+    content: "";
+    position: absolute;
+    left: 50%;
+    bottom: -8px;
+    transform: translateX(-50%);
+    width: 134px;
+    height: 26px;
+    background: radial-gradient(ellipse at center, rgba(24,24,24,0.16) 0%, rgba(24,24,24,0) 72%);
+    z-index: 0;
+  }
+  /* Smart Fit 확대는 이 레이어 하나에만 적용함(JS).
+     표지·딤 처리·"수정" 라벨이 전부 이 안에 함께 들어있어서, 확대되어도 서로 어긋나지 않음.
+     wrap 자체 크기는 그대로라 레이아웃(문서 흐름)에는 영향이 없고 시각적으로만 살짝 커짐. */
+  .hero-cover-scale{
+    position: relative;
+    width: 100%;
+    transform-origin: center center;
+    transition: transform 0.15s ease;
+  }
+  .hero-cover{
+    position: relative;
+    z-index: 1;
+    width: 100%;
+    aspect-ratio: 5 / 8;
+    border-radius: 6px;
+    overflow: hidden;
+    background: var(--hover);
+    box-shadow: 0 10px 22px rgba(24,24,24,0.12);
+  }
+  .hero-cover img{
+    width: 100%; height: 100%;
+    object-fit: contain;
+    background: #F7F7F7;
+    display: block;
+    pointer-events: none;
+  }
+  .hero-cover.no-cover{
+    display:flex; align-items:center; justify-content:center;
+    font-size: 36px;
+    font-weight: 600;
+    color: var(--text-tertiary);
+  }
+  .hero-edit-dim{
+    position: absolute;
+    inset: 0;
+    background: rgba(24,24,24,0.4);
+    border-radius: 6px;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.18s ease;
+    z-index: 2;
+  }
+  .hero-cover-wrap.edit-active .hero-edit-dim{
+    opacity: 1;
+    pointer-events: auto;
+  }
+  .hero-edit-label{
+    position: absolute;
+    top: 50%; left: 50%;
+    transform: translate(-50%, -50%) scale(0.92);
+    min-width: 44px;
+    min-height: 44px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: none;
+    border: none;
+    color: #FFFFFF;
+    font-family: 'Pretendard', sans-serif;
+    font-size: 14px;
+    font-weight: 600;
+    letter-spacing: 0.02em;
+    padding: 8px 14px;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.18s ease, transform 0.18s ease;
+    z-index: 3;
+    cursor: pointer;
+    touch-action: manipulation;
+  }
+  .hero-cover-wrap.edit-active .hero-edit-label{
+    opacity: 1;
+    pointer-events: auto;
+    transform: translate(-50%, -50%) scale(1);
+  }
+  .hero-title{
+    font-size: 16px;
+    font-weight: 600;
+    color: var(--text);
+    margin-bottom: 5px;
+    line-height: 1.4;
+  }
+  .hero-meta{
+    font-size: 12.5px;
+    color: var(--text-tertiary);
+  }
+  @keyframes heroFade{
+    from{ opacity: 0; transform: scale(0.98); }
+    to{ opacity: 1; transform: scale(1); }
+  }
+  @keyframes heroSlideFromRight{
+    from{ opacity: 0; transform: translateX(18px); }
+    to{ opacity: 1; transform: translateX(0); }
+  }
+  @keyframes heroSlideFromLeft{
+    from{ opacity: 0; transform: translateX(-18px); }
+    to{ opacity: 1; transform: translateX(0); }
+  }
+  @keyframes heroFloat{
+    0%, 100%{ transform: translateY(0); }
+    50%{ transform: translateY(2px); }
+  }
+  @keyframes readingFadeIn{
+    from{ opacity: 0; }
+    to{ opacity: 1; }
+  }
+
+  .hero-manage{
+    display: flex;
+    justify-content: center;
+    margin-bottom: 10px;
+  }
+  .hero-add-book{
+    width: 26px; height: 26px;
+    border-radius: 50%;
+    border: 1px solid var(--border);
+    background: var(--surface);
+    color: var(--text-tertiary);
+    font-size: 13px;
+    line-height: 1;
+    cursor: pointer;
+    display: flex; align-items:center; justify-content:center;
+    transition: background 0.15s ease, color 0.15s ease;
+  }
+  .hero-add-book:hover{ background: var(--hover); color: var(--text); }
+
+  /* ── 하단 CTA ─────────────────────────────── */
+  .cta-row{
+    position: fixed;
+    left: 0; right: 0;
+    bottom: max(20px, env(safe-area-inset-bottom));
+    z-index: 60;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+    padding: 0 20px;
+    pointer-events: none;
+  }
+  .cta-btn{
+    pointer-events: auto;
+    border: none;
+    border-radius: 999px;
+    font-family: 'Pretendard', sans-serif;
+    cursor: pointer;
+    transition: transform 0.15s ease, box-shadow 0.15s ease, background 0.15s ease;
+  }
+  .cta-primary{
+    background: var(--accent);
+    color: #FFFFFF;
+    font-size: 14px;
+    font-weight: 700;
+    padding: 14px 26px;
+    box-shadow: 0 3px 10px rgba(24,24,24,0.16);
+  }
+  .cta-primary:hover{ box-shadow: 0 4px 13px rgba(24,24,24,0.2); }
+  .cta-btn:active{ transform: scale(0.96); }
+
+  /* ── 책 읽기 뷰 ───────────────────────────── */
+  .reading-view{
+    max-width: 560px;
+    margin: 18px auto 0;
+  }
+  .reading-view.dir-next,
+  .reading-view.dir-prev{ animation: readingFadeIn 0.14s ease both; }
+  .reading-entry{
+    position: relative;
+    padding: 28px 4px;
+    border-bottom: 1px solid var(--border);
+  }
+  .reading-entry:last-child{ border-bottom: none; }
+  /* 중요 문장: 문장의 위치·폭·카드 높이는 전혀 건드리지 않고,
+     여백 바깥의 아주 얇은 accent strip과 미세한 배경 톤만으로 표시함. */
+  .reading-entry.important{
+    background: #FCFBF7;
+  }
+  .reading-entry.important::before{
+    content: "";
+    position: absolute;
+    left: -14px;
+    top: 28px;
+    bottom: 28px;
+    width: 2px;
+    border-radius: 1px;
+    background: var(--accent);
+    opacity: 0.55;
+  }
+  .reading-text{
+    font-size: 16.5px;
+    line-height: 2;
+    color: var(--text);
+    margin: 0;
+    text-align: left;
+    word-break: keep-all;
+    overflow-wrap: break-word;
+  }
+  .reading-text.important{
+    font-weight: 500;
+  }
+  /* 페이지가 없을 때만: 문장의 "마지막 줄" 끝에만 ··· 버튼 자리를 남겨야 하므로
+     padding-right 대신 문장 끝에 투명한 inline-block 공간을 하나 붙임.
+     이러면 앞줄들은 오른쪽 끝까지 그대로 쓰고, 줄바꿈 때문에 버튼과 겹칠 마지막 줄만 짧아짐. */
+  .reading-text.no-page::after{
+    content: "";
+    display: inline-block;
+    width: 40px;
+    height: 1px;
+  }
+  .reading-page{
+    display: block;
+    margin-top: 10px;
+    padding-right: 42px;
+    font-size: 11.5px;
+    color: var(--text-tertiary);
+  }
+  .quote-entry-note{
+    margin-top: 10px;
+    font-size: 12px;
+    color: var(--text-secondary);
+    background: var(--hover);
+    border-radius: 6px;
+    padding: 9px 11px;
+    line-height: 1.65;
+  }
+  .quote-entry-note .note-label{
+    display:block;
+    font-size: 10.5px;
+    font-weight: 700;
+    color: var(--text-tertiary);
+    margin-bottom: 3px;
+  }
+  .reading-menu{
+    position: absolute;
+    right: 0;
+    bottom: 20px;
+    width: 40px;
+    height: 40px;
+    display: flex; align-items: center; justify-content: center;
+    background: none;
+    border: none;
+    cursor: pointer;
+    color: var(--text-tertiary);
+    opacity: 0.35;
+    font-size: 15px;
+    letter-spacing: 1px;
+    transition: opacity 0.15s ease, color 0.15s ease;
+    touch-action: manipulation;
+  }
+  /* 페이지가 없는 문장은 페이지 줄이 없는 만큼, 메뉴를 문장 마지막 줄에 맞춰 살짝 더 내려줌 */
+  .reading-entry.no-page-entry .reading-menu{
+    bottom: 24px;
+  }
+  .reading-menu:active{ opacity: 1; color: var(--text); }
+  @media (hover: hover) and (pointer: fine){
+    .reading-menu:hover{ opacity: 1; color: var(--text); }
+  }
+
+  .echo-link{
+    display: inline-block;
+    margin-top: 12px;
+    background: none; border: none; cursor: pointer;
+    font-size: 11.5px;
+    color: var(--text-tertiary);
+    padding: 2px 0;
+    opacity: 0.75;
+    transition: color 0.15s ease, opacity 0.15s ease;
+  }
+  .echo-link:hover{ color: var(--accent); opacity: 1; }
+
+  .echo-detail{
+    display: none;
+    flex-direction: column;
+    gap: 16px;
+    margin-top: 14px;
+    padding-top: 14px;
+    border-top: 1px dashed var(--border);
+  }
+  .echo-detail.open{ display: flex; }
+  .echo-book{
+    font-size: 10.5px;
+    font-weight: 600;
+    letter-spacing: 0.07em;
+    text-transform: uppercase;
+    color: var(--text-secondary);
+    margin-bottom: 6px;
+  }
+  .echo-quote{
+    font-size: 13.5px;
+    line-height: 1.7;
+    color: var(--text);
+    margin: 0 0 3px;
+  }
+  .echo-quote-page{
+    font-size: 11px;
+    color: var(--text-tertiary);
+    margin: 0 0 10px;
+  }
+  .echo-quote:last-of-type{ margin-bottom: 0; }
+
+  .empty{
+    text-align:center;
+    padding: 64px 20px;
+    color: var(--text-tertiary);
+    font-size: 13.5px;
+    line-height: 1.9;
+  }
+  .empty-title{
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--text-secondary);
+    margin-bottom: 18px;
+  }
+  .empty-cta{
+    border: 1px solid var(--border);
+    background: var(--surface);
+    color: var(--text);
+    border-radius: 999px;
+    padding: 10px 20px;
+    font-family: 'Pretendard', sans-serif;
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
+  }
+  .empty-cta:hover{ background: var(--hover); }
+
+  /* ── 확인 다이얼로그 ──────────────────────── */
+  .modal-overlay{
+    position: fixed;
+    inset: 0;
+    background: rgba(31,35,40,0.32);
+    display: none;
+    align-items: center;
+    justify-content: center;
+    padding: 20px;
+    z-index: 100;
+  }
+  .modal-overlay.open{ display: flex; }
+  .modal-box{
+    background: var(--surface);
+    border-radius: 14px;
+    width: 100%;
+    max-width: 440px;
+    box-shadow: 0 12px 32px rgba(31,35,40,0.16);
+    animation: fadeIn 0.18s ease;
+  }
+  .confirm-box{
+    max-width: 300px;
+    padding: 26px 22px 20px;
+  }
+  .confirm-message{
+    margin: 0 0 20px;
+    font-size: 14px;
+    line-height: 1.75;
+    color: var(--text);
+    text-align: center;
+  }
+  .confirm-actions{ display:flex; gap: 8px; }
+  .confirm-btn{
+    flex: 1;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 9px 0;
+    font-family: 'Pretendard', sans-serif;
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
+    background: var(--surface);
+  }
+  .confirm-cancel{ color: var(--text-secondary); }
+  .confirm-cancel:hover{ background: var(--hover); }
+  .confirm-ok{ color: var(--danger); border-color: var(--danger-soft); background: var(--danger-soft); }
+  .confirm-ok:hover{ background: #EBDAD6; }
+
+  @keyframes fadeIn{
+    from{ opacity: 0; transform: translateY(2px); }
+    to{ opacity: 1; transform: translateY(0); }
+  }
+
+  /* ── 중앙 Dialog 공통 (모바일·PC 동일) ────── */
+  .sheet-overlay{
+    position: fixed;
+    inset: 0;
+    background: rgba(24,24,24,0.28);
+    backdrop-filter: blur(4px);
+    -webkit-backdrop-filter: blur(4px);
+    display: none;
+    align-items: center;
+    justify-content: center;
+    padding: 16px;
+    z-index: 90;
+  }
+  .sheet-overlay.open{ display: flex; }
+  .bottom-sheet{
+    width: 100%;
+    max-width: 520px;
+    height: auto;
+    max-height: min(82dvh, 720px);
+    background: var(--surface);
+    border-radius: 20px;
+    box-shadow: 0 20px 50px rgba(24,24,24,0.18);
+    opacity: 0;
+    transform: scale(0.97) translateY(4px);
+    transition: opacity 0.2s ease, transform 0.2s ease;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+  }
+  .sheet-overlay.open .bottom-sheet{
+    opacity: 1;
+    transform: scale(1) translateY(0);
+  }
+  /* 문장 "···" 액션 메뉴는 다른 입력 Dialog보다 작게 */
+  .bottom-sheet.action-sheet{
+    max-width: 360px;
+  }
+  .sheet-handle{ display: none; }
+  .sheet-body{ padding-top: 22px; }
+  .callout-body{ padding-top: 20px; }
+  .action-sheet .sheet-body{ padding-top: 22px; }
+
+  /* 모바일에서는 책이 서비스의 주인공이라는 인상이 조금 더 강하도록 Hero 존재감을 살짝 키움.
+     레이아웃 구조는 그대로 두고 크기/여백만 미세 조정. */
+  @media (max-width: 767px){
+    .wrap{ padding-top: 40px; }
+    .hero-cover-wrap{
+      width: 200px;
+      margin: 0 auto 16px;
+    }
+    .hero-cover-wrap::before{
+      width: 149px;
+    }
+    .hero-title{
+      font-size: 18px;
+      margin-bottom: 4px;
+    }
+    .hero-meta{ font-size: 14px; }
+    .hero-dots{ margin-top: 12px; }
+    .reading-view{ margin-top: 14px; }
+  }
+
+  .sheet-title{
+    font-size: 14px;
+    font-weight: 700;
+    color: var(--text);
+    margin: 4px 20px 14px;
+  }
+  .sheet-body{
+    padding: 0 20px 20px;
+    overflow-y: auto;
+  }
+
+  /* ── 문장 남기기 시트 ─────────────────────── */
+  .callout-body{
+    padding: 8px 20px 20px;
+    overflow-y: auto;
+  }
+  .sheet-book-context{
+    width: 100%;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    background: var(--hover);
+    border-radius: 10px;
+    padding: 8px 10px;
+    margin-bottom: 14px;
+    position: relative;
+  }
+  .sheet-book-cover{
+    flex-shrink: 0;
+    width: 30px;
+    aspect-ratio: 5 / 8;
+    height: auto;
+    border-radius: 3px;
+    overflow: hidden;
+    background: var(--border);
+    display: flex; align-items:center; justify-content:center;
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--text-tertiary);
+    transition: transform 0.15s ease;
+  }
+  .sheet-book-cover img{ width:100%; height:100%; object-fit:contain; background:#F7F7F7; display:block; }
+  .sheet-book-select{
+    flex: 1;
+    appearance: none;
+    -webkit-appearance: none;
+    background: transparent;
+    border: none;
+    outline: none;
+    font-family: 'Pretendard', sans-serif;
+    font-size: 13.5px;
+    font-weight: 600;
+    color: var(--text);
+    cursor: pointer;
+    padding-right: 18px;
+  }
+  .sheet-book-change{
+    position: absolute;
+    right: 12px;
+    top: 50%;
+    transform: translateY(-50%);
+    font-size: 11px;
+    color: var(--text-tertiary);
+    pointer-events: none;
+  }
+  .input-row{
+    display: flex;
+    align-items: flex-end;
+    gap: 8px;
+  }
+  textarea#quoteInput{
+    flex: 1;
+    width: 100%;
+    border: none;
+    background: transparent;
+    font-family: 'Pretendard', sans-serif;
+    font-size: 16.5px;
+    line-height: 1.65;
+    color: var(--text);
+    resize: none;
+    min-height: 112px;
+    max-height: none;
+    overflow: hidden;
+    outline: none;
+    padding: 6px 0;
+  }
+  textarea#quoteInput::placeholder{ color: var(--text-tertiary); }
+
+  button#submitBtn{
+    flex-shrink: 0;
+    width: 38px;
+    height: 38px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: none;
+    color: var(--text-tertiary);
+    border: none;
+    border-radius: 8px;
+    font-size: 16px;
+    cursor: pointer;
+    transition: color 0.15s ease, background 0.15s ease;
+  }
+  button#submitBtn:hover{ color: var(--accent); background: var(--hover); }
+  button#submitBtn:active{ opacity: 0.7; }
+  button#submitBtn:disabled{ opacity: 0.35; cursor: default; }
+
+  .page-toggle{
+    display: inline-block;
+    background: none;
+    border: none;
+    padding: 8px 0 2px;
+    margin-top: 4px;
+    font-family: 'Pretendard', sans-serif;
+    font-size: 12.5px;
+    color: var(--text-tertiary);
+    cursor: pointer;
+  }
+  .page-toggle:hover{ color: var(--text-secondary); }
+  .meta-row{
+    display:flex; gap: 8px;
+    justify-content: flex-start;
+    padding-top: 8px;
+  }
+  .meta-field{
+    display:flex; align-items:center; gap: 6px;
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 6px 10px;
+    position: relative;
+    flex: 0 0 96px;
+  }
+  .meta-field input{
+    border: none;
+    background: transparent;
+    font-family: 'Pretendard', sans-serif;
+    font-size: 12.5px;
+    color: var(--text-secondary);
+    outline: none;
+    width: 100%;
+  }
+  .meta-field input::placeholder{ color: var(--text-tertiary); }
+
+  .status-msg{
+    font-size: 12px;
+    color: var(--text-secondary);
+    min-height: 0;
+    max-height: 0;
+    overflow: hidden;
+    opacity: 0;
+    transition: opacity 0.3s ease, max-height 0.3s ease, margin 0.3s ease;
+  }
+  .status-msg.show{
+    opacity: 1;
+    max-height: 30px;
+    margin-top: 8px;
+  }
+  .status-msg.error{ color: var(--danger); }
+  .status-msg.loading{
+    color: var(--text-tertiary);
+    animation: gentlePulse 1.6s ease-in-out infinite;
+  }
+  @keyframes gentlePulse{
+    0%, 100%{ opacity: 0.5; }
+    50%{ opacity: 1; }
+  }
+
+  /* ── 책 직접 추가 시트 ────────────────────── */
+  .add-book-input{
+    width: 100%;
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 11px 14px;
+    font-family: 'Pretendard', sans-serif;
+    font-size: 14px;
+    color: var(--text);
+    outline: none;
+    margin-bottom: 10px;
+    background: var(--bg);
+  }
+  .add-book-input:focus{ border-color: var(--accent); }
+  .add-book-cover-picker{
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    margin-bottom: 16px;
+  }
+  .add-book-cover-btn{
+    flex-shrink: 0;
+    border: none;
+    background: none;
+    padding: 0;
+    cursor: pointer;
+  }
+  .add-book-cover-preview{
+    width: 70px;
+    aspect-ratio: 5 / 8;
+    border-radius: 6px;
+    overflow: hidden;
+    background: var(--hover);
+    border: 1px dashed var(--border);
+    display: flex; align-items: center; justify-content: center;
+    font-size: 22px;
+    color: var(--text-tertiary);
+    transition: transform 0.15s ease;
+  }
+  .add-book-cover-preview img{ width: 100%; height: 100%; object-fit: contain; background: #F7F7F7; display: block; }
+  .add-book-cover-label{
+    font-size: 12.5px;
+    color: var(--text-secondary);
+  }
+  .add-book-submit{
+    width: 100%;
+    margin-top: 6px;
+    padding: 13px 0;
+  }
+
+  /* ── 저장 완료 토스트 ─────────────────────── */
+  .toast{
+    position: fixed;
+    top: max(20px, env(safe-area-inset-top));
+    left: 50%;
+    transform: translateX(-50%) translateY(-6px);
+    background: var(--accent);
+    color: #FFFFFF;
+    font-size: 12.5px;
+    font-weight: 600;
+    padding: 9px 18px;
+    border-radius: 999px;
+    box-shadow: 0 6px 18px rgba(24,24,24,0.2);
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.2s ease, transform 0.2s ease;
+    z-index: 200;
+    white-space: nowrap;
+  }
+  .toast.show{
+    opacity: 1;
+    transform: translateX(-50%) translateY(0);
+  }
+
+  /* ── 문장 ··· 액션 시트 ───────────────────── */
+  .action-sheet .sheet-body{
+    padding: 6px 8px 20px;
+  }
+  .action-item{
+    width: 100%;
+    display: flex;
+    align-items: center;
+    background: none;
+    border: none;
+    border-bottom: 1px solid var(--border);
+    padding: 16px 14px;
+    font-family: 'Pretendard', sans-serif;
+    font-size: 15px;
+    font-weight: 400;
+    letter-spacing: -0.01em;
+    color: var(--text);
+    cursor: pointer;
+    text-align: left;
+    transition: background 0.12s ease;
+  }
+  .action-item:last-child{ border-bottom: none; }
+  .action-item:active{ background: var(--hover); }
+  @media (hover: hover) and (pointer: fine){
+    .action-item:hover{ background: var(--hover); }
+  }
+  .action-item.danger{ color: var(--danger); }
+
+  footer.note{
+    margin-top: 56px;
+    text-align:center;
+    font-size: 11px;
+    color: var(--text-tertiary);
+  }
+
+  /* iOS Safari는 input/textarea의 font-size가 16px 미만이면 포커스 시 화면을 자동으로 확대함.
+     사용자의 핀치 줌 기능 자체는 막지 않고(viewport에 maximum-scale/user-scalable 제한 없음),
+     입력창 폰트 크기만 16px로 맞춰서 원치 않는 자동 확대만 방지함. */
+  @media (max-width: 768px){
+    input,
+    textarea,
+    select{
+      font-size: 16px !important;
+    }
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <div class="book-hero" id="bookHero"></div>
+
+  <div class="reading-view" id="readingView"></div>
+
+</div>
+
+<div class="toast" id="toastMsg"></div>
+
+<div class="cta-row">
+  <button class="cta-btn cta-primary" id="addQuoteBtn">문장 남기기</button>
+</div>
+
+<div class="modal-overlay" id="confirmOverlay">
+  <div class="modal-box confirm-box">
+    <p class="confirm-message" id="confirmMessage"></p>
+    <div class="confirm-actions">
+      <button class="confirm-btn confirm-cancel" id="confirmCancel">취소</button>
+      <button class="confirm-btn confirm-ok" id="confirmOk">삭제</button>
+    </div>
+  </div>
+</div>
+
+<!-- 문장 남기기 -->
+<div class="sheet-overlay" id="sheetOverlay">
+  <div class="bottom-sheet">
+    <div class="sheet-handle"></div>
+    <div class="callout-body">
+      <div class="sheet-book-context">
+        <span class="sheet-book-cover" id="sheetBookCover"></span>
+        <select id="sheetBookSelect" class="sheet-book-select"></select>
+        <span class="sheet-book-change">▾</span>
+      </div>
+      <div class="input-row">
+        <textarea id="quoteInput" rows="1" placeholder="기억하고 싶은 문장을 남겨보세요."></textarea>
+        <button id="submitBtn" title="기록하기" aria-label="기록하기">→</button>
+      </div>
+      <button type="button" class="page-toggle" id="pageToggleBtn">+ 페이지 추가 (선택)</button>
+      <div class="meta-row" id="metaRow" style="display:none;">
+        <div class="meta-field">
+          <input id="pageInput" type="text" inputmode="numeric" pattern="[0-9]*" placeholder="페이지">
+        </div>
+      </div>
+      <div class="status-msg" id="statusMsg"></div>
+    </div>
+  </div>
+</div>
+
+<!-- 책 추가하기 (직접 입력) -->
+<div class="sheet-overlay" id="addBookOverlay">
+  <div class="bottom-sheet">
+    <div class="sheet-handle"></div>
+    <div class="sheet-body">
+      <div class="sheet-title">책 추가하기</div>
+
+      <div class="add-book-cover-picker">
+        <button type="button" class="add-book-cover-btn" id="addBookCoverBtn">
+          <span class="add-book-cover-preview" id="addBookCoverPreview">+</span>
+        </button>
+        <input type="file" accept="image/*" id="addBookCoverInput" style="display:none">
+        <span class="add-book-cover-label">표지 선택 (선택)</span>
+      </div>
+
+      <input type="text" id="addBookTitleInput" class="add-book-input" placeholder="책 제목">
+      <input type="text" id="addBookAuthorInput" class="add-book-input" placeholder="저자 (선택)">
+
+      <div class="status-msg" id="addBookStatusMsg"></div>
+      <button class="cta-btn cta-primary add-book-submit" id="addBookSubmitBtn">추가하기</button>
+    </div>
+  </div>
+</div>
+
+<!-- 책 정보 수정 (문장 작성과 동일한 Bottom Sheet 패턴) -->
+<div class="sheet-overlay" id="editBookOverlay">
+  <div class="bottom-sheet">
+    <div class="sheet-handle"></div>
+    <div class="sheet-body">
+      <div class="sheet-title">책 정보 수정</div>
+
+      <div class="add-book-cover-picker">
+        <button type="button" class="add-book-cover-btn" id="editBookCoverBtn">
+          <span class="add-book-cover-preview" id="editBookCoverPreview">+</span>
+        </button>
+        <input type="file" accept="image/*" id="editBookCoverInput" style="display:none">
+        <span class="add-book-cover-label">표지 변경 (선택)</span>
+      </div>
+
+      <input type="text" id="editBookTitleInput" class="add-book-input" placeholder="책 제목">
+      <input type="text" id="editBookAuthorInput" class="add-book-input" placeholder="저자 (선택)">
+
+      <div class="status-msg" id="editBookStatusMsg"></div>
+      <button class="cta-btn cta-primary add-book-submit" id="editBookSubmitBtn">저장하기</button>
+    </div>
+  </div>
+</div>
+
+<!-- 문장 ··· 액션 (중요 표시 / 수정 / 삭제) -->
+<div class="sheet-overlay" id="entryActionOverlay">
+  <div class="bottom-sheet action-sheet">
+    <div class="sheet-handle"></div>
+    <div class="sheet-body">
+      <button class="action-item" id="actionImportantBtn">중요 문장으로 표시</button>
+      <button class="action-item" id="actionEditBtn">문장 수정</button>
+      <button class="action-item danger" id="actionDeleteBtn">문장 삭제</button>
+    </div>
+  </div>
+</div>
+
+<!-- 문장 수정 -->
+<div class="sheet-overlay" id="editSheetOverlay">
+  <div class="bottom-sheet">
+    <div class="sheet-handle"></div>
+    <div class="callout-body">
+      <div class="input-row">
+        <textarea id="editQuoteInput" rows="1"></textarea>
+        <button id="editSubmitBtn" title="저장하기" aria-label="저장하기">→</button>
+      </div>
+      <div class="meta-row">
+        <div class="meta-field">
+          <input id="editPageInput" type="text" inputmode="numeric" pattern="[0-9]*" placeholder="페이지">
+        </div>
+      </div>
+      <div class="status-msg" id="editStatusMsg"></div>
+    </div>
+  </div>
+</div>
+
+<script>
+const STORAGE_KEY = 'truth-groups';
+
+// 👇 Cloudflare Worker 배포 후, 여기에 본인 Worker 주소를 넣어주세요.
+// (claude.ai 아티팩트 안에서 미리보기할 때는 이 값이 쓰이지 않고 자동으로 내장 방식이 사용돼요)
+const WORKER_URL = "https://truth-collector-proxy.dingapark1.workers.dev";
+
+// ⚠️ 보안 안내: 아래 SITE_SECRET은 이 HTML 파일 안에 평문으로 들어있습니다.
+// GitHub Pages에 올라간 순간 "누구나 페이지 소스에서 볼 수 있는 값"이 되므로,
+// 엄밀히는 "비밀"이 아니라 "약한 접근 제한 토큰" 정도로 취급해야 합니다.
+// 절대 이 값을 console.log 등으로 출력하지 마세요. (아래 코드 어디에서도 출력하지 않습니다)
+// 더 안전하게 만들고 싶다면 Worker 쪽에서 Origin 검증 강화, 요청 속도 제한(rate limit),
+// 주기적인 SITE_SECRET 교체 등을 함께 적용하는 것을 권장합니다.
+const SITE_SECRET = "my-cat-2026";
+
+const IS_CLAUDE_ARTIFACT = !!window.storage;
+
+// claude.ai 아티팩트 안에서는 window.storage를,
+// 깃허브 페이지 등 밖에서는 Worker + Cloudflare KV(클라우드 저장소)를 사용해서
+// 어느 기기에서 열어도 같은 데이터를 볼 수 있게 함
+const storageAdapter = {
+  async get(key){
+    if(IS_CLAUDE_ARTIFACT){
+      try{ return await window.storage.get(key, false); }catch(e){ return null; }
+    }
+    try{
+      const res = await fetch(WORKER_URL + "/data", {
+        method: "GET",
+        headers: { "X-Site-Secret": SITE_SECRET }
+      });
+      if(!res.ok) return null;
+      const value = await res.text();
+      return { value };
+    }catch(e){
+      return null;
+    }
+  },
+  async set(key, value){
+    if(IS_CLAUDE_ARTIFACT){
+      return await window.storage.set(key, value, false);
+    }
+    try{
+      await fetch(WORKER_URL + "/data", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "X-Site-Secret": SITE_SECRET },
+        body: value
+      });
+    }catch(e){
+      return null;
+    }
+    return { key, value };
+  }
+};
+
+// groups: 기존 "문장 의미 그룹" 데이터 (AI 그룹핑 대상, 그대로 유지)
+// books: 새로 추가된 "내 서재" 컬렉션. bookGroups.book(제목 문자열)과는
+//        정규화된 제목으로 매칭되며, 문장이 하나도 없어도 존재할 수 있음.
+let groups = [];
+let books = [];
+let currentBookId = null;
+
+const bookHero = document.getElementById('bookHero');
+const readingView = document.getElementById('readingView');
+
+const quoteInput = document.getElementById('quoteInput');
+const pageInput = document.getElementById('pageInput');
+const pageToggleBtn = document.getElementById('pageToggleBtn');
+const metaRow = document.getElementById('metaRow');
+const submitBtn = document.getElementById('submitBtn');
+const statusMsg = document.getElementById('statusMsg');
+
+const ctaAddQuote = document.getElementById('addQuoteBtn');
+
+const sheetOverlay = document.getElementById('sheetOverlay');
+const sheetBookCover = document.getElementById('sheetBookCover');
+const sheetBookSelect = document.getElementById('sheetBookSelect');
+
+const addBookOverlay = document.getElementById('addBookOverlay');
+const addBookCoverBtn = document.getElementById('addBookCoverBtn');
+const addBookCoverPreview = document.getElementById('addBookCoverPreview');
+const addBookCoverInput = document.getElementById('addBookCoverInput');
+const addBookTitleInput = document.getElementById('addBookTitleInput');
+const addBookAuthorInput = document.getElementById('addBookAuthorInput');
+const addBookStatusMsg = document.getElementById('addBookStatusMsg');
+const addBookSubmitBtn = document.getElementById('addBookSubmitBtn');
+
+const editBookOverlay = document.getElementById('editBookOverlay');
+const editBookCoverBtn = document.getElementById('editBookCoverBtn');
+const editBookCoverPreview = document.getElementById('editBookCoverPreview');
+const editBookCoverInput = document.getElementById('editBookCoverInput');
+const editBookTitleInput = document.getElementById('editBookTitleInput');
+const editBookAuthorInput = document.getElementById('editBookAuthorInput');
+const editBookStatusMsg = document.getElementById('editBookStatusMsg');
+const editBookSubmitBtn = document.getElementById('editBookSubmitBtn');
+
+const confirmOverlay = document.getElementById('confirmOverlay');
+const confirmMessage = document.getElementById('confirmMessage');
+const confirmCancel = document.getElementById('confirmCancel');
+const confirmOk = document.getElementById('confirmOk');
+let confirmResolver = null;
+
+function showConfirm(message){
+  confirmMessage.textContent = message;
+  confirmOverlay.classList.add('open');
+  return new Promise((resolve) => {
+    confirmResolver = resolve;
+  });
+}
+function resolveConfirm(result){
+  confirmOverlay.classList.remove('open');
+  if(confirmResolver){
+    confirmResolver(result);
+    confirmResolver = null;
+  }
+}
+confirmOk.addEventListener('click', () => resolveConfirm(true));
+confirmCancel.addEventListener('click', () => resolveConfirm(false));
+confirmOverlay.addEventListener('click', (e) => {
+  if(e.target === confirmOverlay) resolveConfirm(false);
+});
+
+let statusTimer = null;
+function showStatus(text, type, autoHideMs){
+  clearTimeout(statusTimer);
+  statusMsg.classList.remove('loading','success','error','show');
+  statusMsg.textContent = text;
+  if(type) statusMsg.classList.add(type);
+  void statusMsg.offsetWidth; // 리플로우를 강제로 일으켜 트랜지션 재시작
+  statusMsg.classList.add('show');
+  if(autoHideMs){
+    statusTimer = setTimeout(() => {
+      statusMsg.classList.remove('show');
+    }, autoHideMs);
+  }
+}
+
+const toastEl = document.getElementById('toastMsg');
+let toastTimer = null;
+function showToast(text, ms){
+  clearTimeout(toastTimer);
+  toastEl.textContent = text;
+  void toastEl.offsetWidth;
+  toastEl.classList.add('show');
+  toastTimer = setTimeout(() => {
+    toastEl.classList.remove('show');
+  }, ms || 1200);
+}
+
+function autoResizeQuoteInput(){
+  quoteInput.style.height = 'auto';
+  quoteInput.style.height = quoteInput.scrollHeight + 'px';
+}
+quoteInput.addEventListener('input', autoResizeQuoteInput);
+autoResizeQuoteInput();
+
+function escapeHtml(str){
+  const div = document.createElement('div');
+  div.textContent = str || '';
+  return div.innerHTML;
+}
+
+function normalizeTitle(title){
+  return (title || '').trim().replace(/\s+/g, ' ').toLowerCase();
+}
+
+// 책을 넘길 때(이전/다음) 방향에 맞춰 살짝 슬라이드되며 전환되는 효과.
+// direction이 없으면(문장 저장/수정/삭제 등 일반 갱신) 방향성 없이 조용히 갱신됨.
+function playDirectionalAnim(el, direction){
+  el.classList.remove('dir-next', 'dir-prev');
+  void el.offsetWidth; // 리플로우를 강제로 일으켜 애니메이션 재시작
+  if(direction === 'next') el.classList.add('dir-next');
+  else if(direction === 'prev') el.classList.add('dir-prev');
+}
+
+// 표지 컨테이너에 이미지를 넣되, 로드 실패 시 이니셜 폴백으로 안전하게 전환.
+// 검색 결과 썸네일과 Hero 표지 모두 이 함수 하나로 통일해서 처리함.
+function renderCoverInto(containerEl, url, initialLetter){
+  if(!containerEl) return;
+  containerEl.innerHTML = '';
+  containerEl.style.transform = '';
+  if(!url){
+    containerEl.classList.add('no-cover');
+    containerEl.textContent = initialLetter || '';
+    return;
+  }
+  const img = document.createElement('img');
+  img.src = url;
+  img.alt = '';
+  img.addEventListener('error', () => {
+    containerEl.classList.add('no-cover');
+    containerEl.innerHTML = '';
+    containerEl.style.transform = '';
+    containerEl.textContent = initialLetter || '';
+  }, { once: true });
+  img.addEventListener('load', () => applySmartCoverFit(img, containerEl), { once: true });
+  containerEl.classList.remove('no-cover');
+  containerEl.appendChild(img);
+}
+
+// 표지 프레임은 전부 5:8 비율로 통일되어 있는데, 출판사마다 실제 표지 비율이 달라
+// object-fit:contain만 쓰면 어떤 책은 여백이 많이 남아 유독 작아 보임.
+// ⚠️ 반드시 "프레임(컨테이너)"을 확대해야 함 — img 자체를 확대하면 이미 프레임 폭/높이를
+// 꽉 채우고 있던 축이 overflow:hidden에 잘려나감(제목·저자명 잘림 위험). 프레임째로 키우면
+// 내부 이미지는 항상 100% 보존된 채 그대로 비례해서만 커지므로 잘릴 위험이 없음.
+//
+// 용도별로 최대 배율과 "실제로 scale을 적용할 대상"이 다름:
+// - Hero(.hero-cover)   : 그림자·"수정" 오버레이와 함께 움직여야 하므로, 한 겹 바깥의
+//                         .hero-cover-scale에 적용(딤/라벨이 표지와 항상 같이 커짐). 최대 1.10배.
+//                         .hero-cover-wrap 자체는 고정 크기라 Hero 레이아웃(제목/저자/Dot 위치,
+//                         전체 높이)은 책이 바뀌어도 절대 흔들리지 않음.
+// - 책 추가/수정 미리보기(.add-book-cover-preview): 최대 1.04배, 자기 자신에 적용.
+// - 문장 작성 시트의 작은 썸네일(.sheet-book-cover): 확대하지 않음(최대 1.00배).
+function applySmartCoverFit(img, containerEl){
+  const iw = img.naturalWidth;
+  const ih = img.naturalHeight;
+  if(!iw || !ih) return;
+
+  let maxScale = 1.0;
+  let scaleTarget = containerEl;
+
+  if(containerEl.classList.contains('hero-cover')){
+    maxScale = 1.10;
+    scaleTarget = containerEl.closest('.hero-cover-scale') || containerEl;
+  } else if(containerEl.classList.contains('add-book-cover-preview')){
+    maxScale = 1.04;
+  } else if(containerEl.classList.contains('sheet-book-cover')){
+    maxScale = 1.0; // 확대하지 않음
+  }
+
+  if(maxScale <= 1.0){
+    scaleTarget.style.transform = '';
+    return;
+  }
+
+  const frameAspect = 5 / 8; // Hero·책 추가·책 수정·썸네일이 공통으로 쓰는 표지 프레임 비율
+  const imgAspect = iw / ih;
+
+  // contain 상태에서 실제로 채워지는 비율(0~1). 1이면 프레임을 완전히 채움.
+  const fillRatio = imgAspect > frameAspect
+    ? frameAspect / imgAspect   // 이미지가 프레임보다 상대적으로 넓어 위아래 여백이 남는 경우
+    : imgAspect / frameAspect;  // 이미지가 프레임보다 상대적으로 좁고 길어 좌우 여백이 남는 경우
+
+  if(fillRatio >= 0.90){
+    scaleTarget.style.transform = '';
+    return;
+  }
+
+  const target = 0.95;
+  let scale = target / fillRatio;
+  if(scale > maxScale) scale = maxScale;
+  if(scale < 1.03){
+    scaleTarget.style.transform = '';
+    return;
+  }
+  scaleTarget.style.transform = `scale(${Math.round(scale * 100) / 100})`;
+}
+
+// 사진 보관함에서 선택한 이미지를 표지 비율에 맞게 축소해서 데이터 URL로 반환.
+// (KV에 그대로 저장해도 부담 없도록 가로/세로 최대 480px, JPEG 품질 0.82로 압축)
+function resizeImageFile(file, maxDim, quality){
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      const img = new Image();
+      img.onload = () => {
+        let width = img.width;
+        let height = img.height;
+        if(width > height){
+          if(width > maxDim){ height = Math.round(height * maxDim / width); width = maxDim; }
+        } else {
+          if(height > maxDim){ width = Math.round(width * maxDim / height); height = maxDim; }
+        }
+        const canvas = document.createElement('canvas');
+        canvas.width = width;
+        canvas.height = height;
+        const ctx = canvas.getContext('2d');
+        ctx.drawImage(img, 0, 0, width, height);
+        resolve(canvas.toDataURL('image/jpeg', quality));
+      };
+      img.onerror = () => reject(new Error('이미지를 읽을 수 없습니다.'));
+      img.src = e.target.result;
+    };
+    reader.onerror = () => reject(new Error('파일을 읽을 수 없습니다.'));
+    reader.readAsDataURL(file);
+  });
+}
+
+function loadCurrentBookId(){
+  try{ return localStorage.getItem('current-book-id') || null; }catch(e){ return null; }
+}
+function saveCurrentBookId(id){
+  try{ localStorage.setItem('current-book-id', id || ''); }catch(e){}
+}
+
+function migrateGroup(g){
+  if(g.bookGroups) return g;
+  const map = new Map();
+  (g.sources || []).forEach(s => {
+    const key = (s.book || '').trim();
+    if(!map.has(key)) map.set(key, []);
+    map.get(key).push({ text: s.text, page: s.page || '', ts: s.ts || 0 });
+  });
+  g.bookGroups = Array.from(map.entries()).map(([book, quotes]) => ({ book, quotes }));
+  if(g.bookGroups.length === 0){
+    g.bookGroups = [{ book: '', quotes: [] }];
+  }
+  g.count = g.bookGroups.length;
+  delete g.sources;
+  return g;
+}
+
+// bookGroups에만 존재하고 아직 books 컬렉션에 없는 책들을 1회성으로 옮겨 담음
+function migrateBooksFromGroups(){
+  const seen = new Set(books.map(b => normalizeTitle(b.title)));
+  let changed = false;
+  groups.forEach(g => {
+    g.bookGroups.forEach(bg => {
+      const title = (bg.book || '').trim();
+      if(!title) return;
+      const norm = normalizeTitle(title);
+      if(!seen.has(norm)){
+        seen.add(norm);
+        books.push({
+          id: 'book_' + Date.now() + '_' + Math.random().toString(36).slice(2,7),
+          title,
+          authors: [],
+          publisher: '',
+          publishedDate: '',
+          coverUrl: '',
+          externalId: '',
+          addedAt: Date.now()
+        });
+        changed = true;
+      }
+    });
+  });
+  return changed;
+}
+
+// 예전 버전에서 "표지 없음"을 빈 문자열로 영구 캐시하던 버그의 잔여 데이터를 1회성 정리.
+// (이제는 book.coverUrl에 직접 저장하는 방식으로 바뀌어서 이 로컬 캐시 자체를 더 이상 사용하지 않음)
+try{
+  for(let i = localStorage.length - 1; i >= 0; i--){
+    const k = localStorage.key(i);
+    if(k && k.startsWith('cover:')){
+      localStorage.removeItem(k);
+    }
+  }
+}catch(e){}
+
+async function loadAll(){
+  let changed = false;
+  try{
+    const res = await storageAdapter.get(STORAGE_KEY);
+    let parsed = res && res.value ? JSON.parse(res.value) : null;
+
+    if(Array.isArray(parsed)){
+      // 예전 저장 형식(문장 배열만 저장)에서 새 형식({groups, books})으로 전환
+      groups = parsed;
+      books = [];
+      changed = true;
+    } else if(parsed && typeof parsed === 'object'){
+      groups = Array.isArray(parsed.groups) ? parsed.groups : [];
+      books = Array.isArray(parsed.books) ? parsed.books : [];
+    } else {
+      groups = [];
+      books = [];
+    }
+
+    // 예전 버전(브라우저 저장 방식)을 쓰던 시절, 이 브라우저에만 남아있던 데이터가 있다면
+    // 클라우드가 비어있을 때 한 번만 끌어올려서 동기화
+    if(!IS_CLAUDE_ARTIFACT && groups.length === 0 && books.length === 0){
+      const legacyRaw = localStorage.getItem(STORAGE_KEY);
+      if(legacyRaw){
+        try{
+          const legacyParsed = JSON.parse(legacyRaw);
+          if(Array.isArray(legacyParsed) && legacyParsed.length > 0){
+            groups = legacyParsed;
+            changed = true;
+          } else if(legacyParsed && Array.isArray(legacyParsed.groups)){
+            groups = legacyParsed.groups;
+            books = Array.isArray(legacyParsed.books) ? legacyParsed.books : [];
+            changed = true;
+          }
+        }catch(e){}
+      }
+    }
+
+    // 예전 데이터 구조(sources 배열)를 새 구조(책 단위 bookGroups)로 1회성 변환
+    groups.forEach(g => { if(!g.bookGroups) changed = true; });
+    groups = groups.map(g => migrateGroup(g));
+
+    // bookGroups에만 있던 책들을 books 컬렉션으로 1회성 이관
+    if(migrateBooksFromGroups()) changed = true;
+
+    // 🧪 테스트 전용: claude.ai 미리보기(IS_CLAUDE_ARTIFACT) 안에서만,
+    // 책이 하나도 없을 때 구글 Books API 없이도 바로 테스트할 수 있도록 책 1권을 임시로 넣어줌.
+    // 실제 깃허브 페이지 배포본에서는 IS_CLAUDE_ARTIFACT가 항상 false라 이 코드는 절대 실행되지 않음.
+    if(IS_CLAUDE_ARTIFACT && books.length === 0){
+      books.push({
+        id: 'book_test_seed',
+        title: '데미안',
+        authors: ['헤르만 헤세'],
+        publisher: '민음사',
+        publishedDate: '2000',
+        coverUrl: '',
+        externalId: '',
+        addedAt: Date.now()
+      });
+      changed = true;
+    }
+
+  }catch(e){
+    console.error('데이터 로드 실패:', e);
+    groups = [];
+    books = [];
+  }
+
+  if(changed){
+    await saveAll();
+  }
+
+  currentBookId = loadCurrentBookId();
+  renderApp();
+}
+
+async function saveAll(){
+  try{
+    await storageAdapter.set(STORAGE_KEY, JSON.stringify({ groups, books }));
+  }catch(e){
+    console.error('저장 실패:', e);
+    showStatus('기록을 저장하지 못했습니다. 잠시 후 다시 시도해주세요.', 'error');
+  }
+}
+
+function getSortedBooks(){
+  return [...books].sort((a, b) => (b.addedAt || 0) - (a.addedAt || 0));
+}
+
+function getBookSentences(book){
+  const norm = normalizeTitle(book.title);
+  const entries = [];
+  groups.forEach(g => {
+    g.bookGroups.forEach((bg, bidx) => {
+      if(normalizeTitle(bg.book || '') !== norm) return;
+      bg.quotes.forEach((q, qidx) => {
+        entries.push({
+          text: q.text, page: q.page, note: q.note, ts: q.ts || 0,
+          important: !!q.important,
+          groupId: g.id, groupCount: g.count, bidx, qidx
+        });
+      });
+    });
+  });
+  entries.sort((a, c) => {
+    const pa = parseInt(a.page, 10), pc = parseInt(c.page, 10);
+    const av = !isNaN(pa), cv = !isNaN(pc);
+    if(av && cv) return pa - pc;
+    if(av) return -1;
+    if(cv) return 1;
+    return 0;
+  });
+  return entries;
+}
+
+// ── 메인 화면 렌더링 ─────────────────────────
+function renderApp(direction){
+  const sortedBooks = getSortedBooks();
+
+  if(sortedBooks.length === 0){
+    bookHero.innerHTML = '';
+    readingView.innerHTML = `
+      <div class="empty">
+        <div class="empty-title">아직 추가한 책이 없습니다.</div>
+        <button class="empty-cta" id="emptyAddBookBtn">첫 책 추가하기</button>
+      </div>`;
+    const btn = document.getElementById('emptyAddBookBtn');
+    if(btn) btn.addEventListener('click', openAddBook);
+    return;
+  }
+
+  let idx = sortedBooks.findIndex(b => b.id === currentBookId);
+  if(idx < 0) idx = 0;
+  currentBookId = sortedBooks[idx].id;
+  saveCurrentBookId(currentBookId);
+
+  renderHero(sortedBooks, idx, direction);
+  renderReadingView(sortedBooks[idx], direction);
+}
+
+function renderHero(sortedBooks, idx, direction){
+  const book = sortedBooks[idx];
+  const sentenceCount = getBookSentences(book).length;
+  const singleBook = sortedBooks.length <= 1;
+
+  const authors = (book.authors || []).filter(Boolean).join(', ');
+  const metaText = authors ? `${authors} · 문장 ${sentenceCount}개` : `문장 ${sentenceCount}개`;
+
+  const dirClass = direction === 'next' ? 'dir-next' : direction === 'prev' ? 'dir-prev' : '';
+
+  const dotsHtml = singleBook ? '' : sortedBooks.map((_, i) =>
+    `<span class="hero-dot ${i === idx ? 'active' : ''}"></span>`
+  ).join('');
+
+  bookHero.innerHTML = `
+    <div class="hero-manage">
+      <button class="hero-add-book" id="heroAddBookBtn" title="책 추가하기">+</button>
+    </div>
+    <div class="hero-nav">
+      <button class="hero-side-arrow left ${singleBook ? 'hidden' : ''}" id="heroPrevArrow" title="이전 책">‹</button>
+      <div class="hero-book ${dirClass}" id="heroBook">
+        <div class="hero-cover-wrap" id="heroCoverWrap">
+          <div class="hero-cover-scale" id="heroCoverScale">
+            <div class="hero-cover no-cover" id="heroCover">${escapeHtml(book.title.slice(0,1))}</div>
+            <div class="hero-edit-dim" id="heroEditDim"></div>
+            <button class="hero-edit-label" id="heroEditLabel" title="책 정보 수정">수정</button>
+          </div>
+        </div>
+        <div class="hero-title">${escapeHtml(book.title)}</div>
+        <div class="hero-meta">${escapeHtml(metaText)}</div>
+      </div>
+      <button class="hero-side-arrow right ${singleBook ? 'hidden' : ''}" id="heroNextArrow" title="다음 책">›</button>
+    </div>
+    <div class="hero-dots">${dotsHtml}</div>
+  `;
+
+  document.getElementById('heroAddBookBtn').addEventListener('click', openAddBook);
+  document.getElementById('heroPrevArrow').addEventListener('click', () => goToBook(idx - 1));
+  document.getElementById('heroNextArrow').addEventListener('click', () => goToBook(idx + 1));
+
+  const coverEl = document.getElementById('heroCover');
+  if(book.coverUrl){
+    renderCoverInto(coverEl, book.coverUrl, book.title.slice(0,1));
+  } else {
+    coverEl.classList.add('no-cover');
+    coverEl.textContent = book.title.slice(0,1);
+  }
+
+  const coverWrapEl = document.getElementById('heroCoverWrap');
+  const editDimEl = document.getElementById('heroEditDim');
+  const editLabelEl = document.getElementById('heroEditLabel');
+
+  // "수정" 라벨/딤 배경은 부모(heroBook)의 드래그·탭 판별 로직과 완전히 분리해서 처리.
+  // pointerdown/pointerup 단계에서 모두 전파를 막아야, 부모가 같은 제스처를 다시 해석해서
+  // edit-active를 도로 꺼버리는 일이 없음 (그래서 '수정'을 눌러도 시트가 안 열리던 버그였음).
+  editDimEl.addEventListener('pointerdown', (e) => e.stopPropagation());
+  editDimEl.addEventListener('pointerup', (e) => e.stopPropagation());
+  editDimEl.addEventListener('click', (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    coverWrapEl.classList.remove('edit-active');
+  });
+
+  editLabelEl.addEventListener('pointerdown', (e) => e.stopPropagation());
+  editLabelEl.addEventListener('pointerup', (e) => e.stopPropagation());
+  editLabelEl.addEventListener('click', (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    coverWrapEl.classList.remove('edit-active');
+    openEditBookSheet(book);
+  });
+
+  // 스와이프(모바일)·드래그(데스크톱)로 책 넘기기 + 가볍게 탭하면 편집 힌트("수정") 토글.
+  // 맨 처음/마지막 책에서 더 당기면 살짝 당겨졌다 튕겨 돌아오는 작은 바운스를 줌.
+  const heroBookEl = document.getElementById('heroBook');
+  let pointerStartX = null;
+  let pointerMoved = false;
+  let dragDx = 0;
+
+  const maxDrag = 90;
+
+  function applyDrag(dx){
+    const atStart = idx === 0;
+    const atEnd = idx === sortedBooks.length - 1;
+    let clamped = dx;
+    // 맨 끝에서 더 당기면 저항을 줘서 조금만 움직이게 함 (고무줄 느낌)
+    if((atStart && dx > 0) || (atEnd && dx < 0)){
+      clamped = dx * 0.35;
+      if(clamped > 10) clamped = 10;
+      if(clamped < -10) clamped = -10;
+    } else if(Math.abs(dx) > maxDrag){
+      clamped = maxDrag * Math.sign(dx);
+    }
+    heroBookEl.style.transform = `translateX(${clamped}px)`;
+  }
+
+  function resetDrag(withBounce){
+    heroBookEl.style.transition = withBounce ? 'transform 0.3s cubic-bezier(0.34, 1.56, 0.64, 1)' : 'transform 0.2s ease';
+    heroBookEl.style.transform = 'translateX(0)';
+    setTimeout(() => { heroBookEl.style.transition = ''; }, 320);
+  }
+
+  heroBookEl.addEventListener('pointerdown', (e) => {
+    if(e.target.closest('.hero-edit-label') || e.target.closest('.hero-edit-dim')) return;
+    pointerStartX = e.clientX;
+    pointerMoved = false;
+    dragDx = 0;
+    heroBookEl.style.transition = 'none';
+  });
+  heroBookEl.addEventListener('pointermove', (e) => {
+    if(e.target.closest('.hero-edit-label') || e.target.closest('.hero-edit-dim')) return;
+    if(pointerStartX === null) return;
+    dragDx = e.clientX - pointerStartX;
+    if(Math.abs(dragDx) > 6) pointerMoved = true;
+    if(!singleBook && pointerMoved) applyDrag(dragDx);
+  });
+  heroBookEl.addEventListener('pointerup', (e) => {
+    if(e.target.closest('.hero-edit-label') || e.target.closest('.hero-edit-dim')) return;
+    if(pointerStartX === null) return;
+    const dx = dragDx;
+    pointerStartX = null;
+
+    if(!singleBook && Math.abs(dx) >= 40){
+      const goingPrev = dx > 0 && idx > 0;
+      const goingNext = dx < 0 && idx < sortedBooks.length - 1;
+      if(goingPrev){ resetDrag(false); goToBook(idx - 1); return; }
+      if(goingNext){ resetDrag(false); goToBook(idx + 1); return; }
+    }
+    if(!pointerMoved){
+      // 가볍게 탭한 것으로 판단 → 편집 힌트("수정") 토글
+      coverWrapEl.classList.toggle('edit-active');
+    }
+    resetDrag(true);
+  });
+  heroBookEl.addEventListener('pointerleave', () => {
+    if(pointerStartX === null) return;
+    pointerStartX = null;
+    resetDrag(true);
+  });
+}
+
+function goToBook(newIdx){
+  const sortedBooks = getSortedBooks();
+  if(newIdx < 0 || newIdx >= sortedBooks.length) return;
+  const oldIdx = sortedBooks.findIndex(b => b.id === currentBookId);
+  const direction = newIdx > oldIdx ? 'next' : 'prev';
+  currentBookId = sortedBooks[newIdx].id;
+  saveCurrentBookId(currentBookId);
+  renderApp(direction);
+}
+
+// 데스크톱 키보드 좌우 방향키 (입력 중일 때는 무시)
+document.addEventListener('keydown', (e) => {
+  const tag = document.activeElement && document.activeElement.tagName;
+  if(tag === 'INPUT' || tag === 'TEXTAREA') return;
+  if(e.key !== 'ArrowLeft' && e.key !== 'ArrowRight') return;
+  const sortedBooks = getSortedBooks();
+  if(sortedBooks.length === 0) return;
+  const idx = sortedBooks.findIndex(b => b.id === currentBookId);
+  goToBook(e.key === 'ArrowLeft' ? idx - 1 : idx + 1);
+});
+
+// ESC 키로 열려있는 Dialog 닫기 (PC)
+document.addEventListener('keydown', (e) => {
+  if(e.key !== 'Escape') return;
+  const dialogs = [
+    { overlay: sheetOverlay, close: closeQuoteSheet },
+    { overlay: addBookOverlay, close: closeAddBook },
+    { overlay: editBookOverlay, close: closeEditBookSheet },
+    { overlay: editSheetOverlay, close: closeEditSheet },
+    { overlay: entryActionOverlay, close: closeEntryAction }
+  ];
+  const openDialog = dialogs.find(d => d.overlay.classList.contains('open'));
+  if(openDialog) openDialog.close();
+});
+
+// 중앙 Dialog가 실제로 "보이는" 화면(visual viewport) 안에 오도록 위치를 맞춤.
+// Dialog 크기를 억지로 키우지 않고, overlay 자체의 top/height만 visualViewport에 맞춰서
+// 키보드가 열려도 그 안에서 자연스럽게 중앙 정렬되고, 키보드를 닫으면 원래 위치로 돌아옴.
+function syncDialogViewport(){
+  const vv = window.visualViewport;
+  if(!vv) return;
+  document.querySelectorAll('.sheet-overlay.open').forEach(overlay => {
+    overlay.style.top = `${vv.offsetTop}px`;
+    overlay.style.height = `${vv.height}px`;
+    overlay.style.bottom = 'auto';
+  });
+}
+if(window.visualViewport){
+  window.visualViewport.addEventListener('resize', syncDialogViewport);
+  window.visualViewport.addEventListener('scroll', syncDialogViewport);
+}
+window.addEventListener('orientationchange', syncDialogViewport);
+
+function renderReadingView(book, direction){
+  const entries = getBookSentences(book);
+
+  if(entries.length === 0){
+    readingView.innerHTML = `
+      <div class="empty">
+        <div class="empty-title">아직 남긴 문장이 없습니다.</div>
+      </div>`;
+    playDirectionalAnim(readingView, direction);
+    return;
+  }
+
+  readingView.innerHTML = entries.map((e, entryIdx) => {
+    const otherCount = (e.groupCount || 1) - 1;
+    return `
+    <div class="reading-entry ${e.page ? '' : 'no-page-entry'} ${e.important ? 'important' : ''}">
+      <p class="reading-text ${e.page ? '' : 'no-page'} ${e.important ? 'important' : ''}">${escapeHtml(e.text)}</p>
+      ${e.page ? `<span class="reading-page">${escapeHtml(e.page)}p</span>` : ''}
+      <button class="reading-menu" data-gid="${e.groupId}" data-bidx="${e.bidx}" data-qidx="${e.qidx}" title="더보기">···</button>
+      ${e.note ? `<div class="quote-entry-note"><span class="note-label">그때의 생각</span>${escapeHtml(e.note)}</div>` : ''}
+      ${otherCount > 0 ? `
+        <button class="echo-link" data-gid="${e.groupId}" data-echo="echo-${entryIdx}">같은 생각을 한 책 ${otherCount}권 →</button>
+        <div class="echo-detail" id="echo-${entryIdx}"></div>
+      ` : ''}
+    </div>
+    `;
+  }).join('');
+
+  readingView.querySelectorAll('.echo-link').forEach(btn=>{
+    btn.addEventListener('click', ()=>{
+      const echoEl = document.getElementById(btn.dataset.echo);
+      const opening = !echoEl.classList.contains('open');
+      if(opening && !echoEl.dataset.filled){
+        echoEl.dataset.filled = '1';
+        const g = groups.find(x => x.id === btn.dataset.gid);
+        if(g){
+          echoEl.innerHTML = g.bookGroups
+            .filter(bg => normalizeTitle(bg.book) !== normalizeTitle(book.title))
+            .map(bg => `
+              <div>
+                <div class="echo-book">${escapeHtml(bg.book || '출처 미상')}</div>
+                ${bg.quotes.map(q => `
+                  <p class="echo-quote">${escapeHtml(q.text)}</p>
+                  ${q.page ? `<p class="echo-quote-page">${escapeHtml(q.page)}p</p>` : ''}
+                `).join('')}
+              </div>
+            `).join('');
+        }
+      }
+      echoEl.classList.toggle('open');
+    });
+  });
+
+  readingView.querySelectorAll('.reading-menu').forEach(btn=>{
+    btn.addEventListener('click', ()=>{
+      openEntryAction({
+        gid: btn.dataset.gid,
+        bidx: parseInt(btn.dataset.bidx, 10),
+        qidx: parseInt(btn.dataset.qidx, 10)
+      });
+    });
+  });
+
+  playDirectionalAnim(readingView, direction);
+}
+
+// ── 문장 ··· 액션(중요 표시 / 수정 / 삭제) ────
+const entryActionOverlay = document.getElementById('entryActionOverlay');
+const actionImportantBtn = document.getElementById('actionImportantBtn');
+const actionEditBtn = document.getElementById('actionEditBtn');
+const actionDeleteBtn = document.getElementById('actionDeleteBtn');
+let actionContext = null;
+
+function findQuote(ctx){
+  const g = groups.find(x => x.id === ctx.gid);
+  const bg = g && g.bookGroups[ctx.bidx];
+  const q = bg && bg.quotes[ctx.qidx];
+  return { g, bg, q };
+}
+
+function openEntryAction(ctx){
+  actionContext = ctx;
+  const { q } = findQuote(ctx);
+  actionImportantBtn.textContent = (q && q.important) ? '중요 표시 해제' : '중요 문장으로 표시';
+  entryActionOverlay.classList.add('open');
+  syncDialogViewport();
+}
+function closeEntryAction(){
+  entryActionOverlay.classList.remove('open');
+}
+entryActionOverlay.addEventListener('click', (e) => {
+  if(e.target === entryActionOverlay) closeEntryAction();
+});
+
+actionImportantBtn.addEventListener('click', async () => {
+  const ctx = actionContext;
+  closeEntryAction();
+  if(!ctx) return;
+  const { q } = findQuote(ctx);
+  if(!q) return;
+  q.important = !q.important;
+  await saveAll();
+  renderApp();
+});
+
+actionEditBtn.addEventListener('click', () => {
+  const ctx = actionContext;
+  closeEntryAction();
+  if(ctx) openEditSheet(ctx);
+});
+
+actionDeleteBtn.addEventListener('click', async () => {
+  const ctx = actionContext;
+  closeEntryAction();
+  if(!ctx) return;
+  if(!(await showConfirm('이 문장을 삭제하시겠습니까?'))) return;
+
+  const g = groups.find(x => x.id === ctx.gid);
+  if(!g) return;
+  const bg = g.bookGroups[ctx.bidx];
+  if(!bg) return;
+
+  bg.quotes.splice(ctx.qidx, 1);
+  if(bg.quotes.length === 0){
+    g.bookGroups.splice(ctx.bidx, 1);
+  }
+  g.count = g.bookGroups.length;
+  if(g.count === 0){
+    groups = groups.filter(x => x.id !== ctx.gid);
+  }
+
+  await saveAll();
+  renderApp();
+});
+
+// ── 문장 수정 시트 ───────────────────────────
+const editSheetOverlay = document.getElementById('editSheetOverlay');
+const editQuoteInput = document.getElementById('editQuoteInput');
+const editPageInput = document.getElementById('editPageInput');
+const editSubmitBtn = document.getElementById('editSubmitBtn');
+const editStatusMsg = document.getElementById('editStatusMsg');
+let editContext = null;
+
+function autoResizeEditInput(){
+  editQuoteInput.style.height = 'auto';
+  editQuoteInput.style.height = editQuoteInput.scrollHeight + 'px';
+}
+editQuoteInput.addEventListener('input', autoResizeEditInput);
+
+function showEditStatus(text, type){
+  editStatusMsg.classList.remove('error','show');
+  editStatusMsg.textContent = text;
+  if(type) editStatusMsg.classList.add(type);
+  void editStatusMsg.offsetWidth;
+  editStatusMsg.classList.add('show');
+}
+
+function openEditSheet(ctx){
+  const g = groups.find(x => x.id === ctx.gid);
+  if(!g) return;
+  const bg = g.bookGroups[ctx.bidx];
+  if(!bg) return;
+  const q = bg.quotes[ctx.qidx];
+  if(!q) return;
+
+  editContext = ctx;
+  editQuoteInput.value = q.text;
+  editPageInput.value = q.page || '';
+  editStatusMsg.classList.remove('show');
+  editSheetOverlay.classList.add('open');
+  syncDialogViewport();
+  requestAnimationFrame(autoResizeEditInput);
+  setTimeout(() => editQuoteInput.focus(), 250);
+}
+function closeEditSheet(){
+  editSheetOverlay.classList.remove('open');
+}
+editSheetOverlay.addEventListener('click', (e) => {
+  if(e.target === editSheetOverlay) closeEditSheet();
+});
+
+async function handleEditSubmit(){
+  const newText = editQuoteInput.value.trim();
+  if(!newText){
+    showEditStatus('문장을 입력해주세요.', 'error');
+    return;
+  }
+  if(!editContext) return;
+
+  const g = groups.find(x => x.id === editContext.gid);
+  if(!g) return;
+  const bg = g.bookGroups[editContext.bidx];
+  if(!bg) return;
+  const q = bg.quotes[editContext.qidx];
+  if(!q) return;
+
+  editSubmitBtn.disabled = true;
+  try{
+    q.text = newText;
+    q.page = editPageInput.value.trim();
+    await saveAll();
+    renderApp();
+    closeEditSheet();
+    showToast('✓ 수정했습니다.');
+  }catch(e){
+    console.error('문장 수정 실패:', e);
+    showEditStatus('수정 사항을 저장하지 못했습니다.', 'error');
+  }finally{
+    editSubmitBtn.disabled = false;
+  }
+}
+editSubmitBtn.addEventListener('click', handleEditSubmit);
+editQuoteInput.addEventListener('keydown', (e) => {
+  if(e.key === 'Enter' && !e.shiftKey){
+    e.preventDefault();
+    handleEditSubmit();
+  }
+});
+editPageInput.addEventListener('keydown', (e) => {
+  if(e.key === 'Enter'){
+    e.preventDefault();
+    handleEditSubmit();
+  }
+});
+
+// ── 문장 남기기 시트 ─────────────────────────
+function openQuoteSheet(){
+  if(books.length === 0){
+    openAddBook();
+    return;
+  }
+  updateSheetBookContext();
+  resetPageToggle();
+  sheetOverlay.classList.add('open');
+  syncDialogViewport();
+  setTimeout(() => quoteInput.focus(), 250);
+}
+function closeQuoteSheet(){
+  sheetOverlay.classList.remove('open');
+}
+ctaAddQuote.addEventListener('click', openQuoteSheet);
+sheetOverlay.addEventListener('click', (e) => {
+  if(e.target !== sheetOverlay) return;
+  // 입력하던 문장이 있는데 실수로 바깥을 눌러 잃어버리지 않도록, 비어있을 때만 닫힘
+  if(quoteInput.value.trim() !== '') return;
+  closeQuoteSheet();
+});
+
+// 페이지는 부가 정보라 기본적으로 숨겨두고, 필요할 때만 "+ 페이지 추가"로 펼침
+function resetPageToggle(){
+  pageInput.value = '';
+  metaRow.style.display = 'none';
+  pageToggleBtn.style.display = 'inline-block';
+}
+pageToggleBtn.addEventListener('click', () => {
+  pageToggleBtn.style.display = 'none';
+  metaRow.style.display = 'flex';
+  pageInput.focus();
+});
+
+function updateSheetBookContext(){
+  const sortedBooks = getSortedBooks();
+  const book = books.find(b => b.id === currentBookId) || sortedBooks[0];
+  if(!book) return;
+  currentBookId = book.id;
+
+  // select 옵션 구성: 이미 서재에 추가된 책들만 (새 책 추가는 Hero의 + 버튼에서)
+  sheetBookSelect.innerHTML = sortedBooks.map(b =>
+    `<option value="${b.id}">${escapeHtml(b.title)}</option>`
+  ).join('');
+  sheetBookSelect.value = currentBookId;
+
+  sheetBookCover.className = 'sheet-book-cover';
+  if(book.coverUrl){
+    renderCoverInto(sheetBookCover, book.coverUrl, book.title.slice(0, 1));
+  } else {
+    sheetBookCover.classList.add('no-cover');
+    sheetBookCover.textContent = book.title.slice(0, 1);
+  }
+}
+
+// 네이티브 select라서 iOS에서는 탭하면 기기 고유의 휠 피커(드르륵 선택)가 그대로 뜸.
+sheetBookSelect.addEventListener('change', () => {
+  currentBookId = sheetBookSelect.value;
+  saveCurrentBookId(currentBookId);
+  updateSheetBookContext();
+});
+
+// ── 책 추가하기(직접 입력) 시트 ───────────────
+// 트리거: Hero 하단의 + 버튼(renderHero), 빈 상태의 "첫 책 추가하기" 버튼,
+// 책 선택 select의 "새 책 추가" 옵션에서 각각 openAddBook()을 호출함.
+
+let pendingCoverDataUrl = '';
+
+function openAddBook(){
+  addBookTitleInput.value = '';
+  addBookAuthorInput.value = '';
+  addBookCoverInput.value = '';
+  pendingCoverDataUrl = '';
+  renderCoverInto(addBookCoverPreview, null, '+');
+  addBookStatusMsg.classList.remove('show');
+  addBookOverlay.classList.add('open');
+  syncDialogViewport();
+  setTimeout(() => addBookTitleInput.focus(), 250);
+}
+function closeAddBook(){
+  addBookOverlay.classList.remove('open');
+}
+addBookOverlay.addEventListener('click', (e) => {
+  if(e.target === addBookOverlay) closeAddBook();
+});
+
+addBookCoverBtn.addEventListener('click', () => addBookCoverInput.click());
+addBookCoverInput.addEventListener('change', async () => {
+  const file = addBookCoverInput.files && addBookCoverInput.files[0];
+  if(!file) return;
+  try{
+    pendingCoverDataUrl = await resizeImageFile(file, 480, 0.82);
+    renderCoverInto(addBookCoverPreview, pendingCoverDataUrl, '+');
+  }catch(e){
+    console.error('표지 이미지 처리 실패:', e && e.message);
+    showAddBookStatus('이미지를 불러오지 못했습니다.', 'error');
+  }
+});
+
+function showAddBookStatus(text, type){
+  addBookStatusMsg.classList.remove('error','show');
+  addBookStatusMsg.textContent = text;
+  if(type) addBookStatusMsg.classList.add(type);
+  void addBookStatusMsg.offsetWidth;
+  addBookStatusMsg.classList.add('show');
+}
+
+async function handleAddBookSubmit(){
+  const title = addBookTitleInput.value.trim();
+  if(!title){
+    showAddBookStatus('책 제목을 입력해주세요.', 'error');
+    return;
+  }
+  const author = addBookAuthorInput.value.trim();
+
+  addBookSubmitBtn.disabled = true;
+  try{
+    const newBook = {
+      id: 'book_' + Date.now() + '_' + Math.random().toString(36).slice(2,7),
+      title,
+      authors: author ? [author] : [],
+      publisher: '',
+      publishedDate: '',
+      coverUrl: pendingCoverDataUrl || '',
+      externalId: '',
+      addedAt: Date.now()
+    };
+    books.push(newBook);
+
+    await saveAll();
+    currentBookId = newBook.id;
+    saveCurrentBookId(currentBookId);
+    closeAddBook();
+    renderApp();
+
+    // 문장을 쓰던 중에 "새 책 추가"로 들어온 경우, 시트는 닫지 않고
+    // 방금 추가한 책으로 컨텍스트만 갱신해서 작성 흐름이 끊기지 않도록 함
+    if(sheetOverlay.classList.contains('open')){
+      updateSheetBookContext();
+    }
+  }catch(e){
+    console.error('책 추가 실패:', e);
+    showAddBookStatus('책을 추가하지 못했습니다. 다시 시도해주세요.', 'error');
+  }finally{
+    addBookSubmitBtn.disabled = false;
+  }
+}
+addBookSubmitBtn.addEventListener('click', handleAddBookSubmit);
+addBookTitleInput.addEventListener('keydown', (e) => {
+  if(e.key === 'Enter'){ e.preventDefault(); handleAddBookSubmit(); }
+});
+addBookAuthorInput.addEventListener('keydown', (e) => {
+  if(e.key === 'Enter'){ e.preventDefault(); handleAddBookSubmit(); }
+});
+
+// ── 책 정보 수정 시트 ─────────────────────────
+let editingBookId = null;
+let pendingEditCoverDataUrl = '';
+
+function openEditBookSheet(book){
+  editingBookId = book.id;
+  editBookTitleInput.value = book.title;
+  editBookAuthorInput.value = (book.authors && book.authors[0]) || '';
+  pendingEditCoverDataUrl = book.coverUrl || '';
+
+  renderCoverInto(editBookCoverPreview, book.coverUrl || null, '+');
+  editBookCoverInput.value = '';
+  editBookStatusMsg.classList.remove('show');
+  editBookOverlay.classList.add('open');
+  syncDialogViewport();
+  setTimeout(() => editBookTitleInput.focus(), 250);
+}
+function closeEditBookSheet(){
+  editBookOverlay.classList.remove('open');
+}
+editBookOverlay.addEventListener('click', (e) => {
+  if(e.target === editBookOverlay) closeEditBookSheet();
+});
+
+editBookCoverBtn.addEventListener('click', () => editBookCoverInput.click());
+editBookCoverInput.addEventListener('change', async () => {
+  const file = editBookCoverInput.files && editBookCoverInput.files[0];
+  if(!file) return;
+  try{
+    pendingEditCoverDataUrl = await resizeImageFile(file, 480, 0.82);
+    renderCoverInto(editBookCoverPreview, pendingEditCoverDataUrl, '+');
+  }catch(e){
+    console.error('표지 이미지 처리 실패:', e && e.message);
+    showEditBookStatus('이미지를 불러오지 못했습니다.', 'error');
+  }
+});
+
+function showEditBookStatus(text, type){
+  editBookStatusMsg.classList.remove('error','show');
+  editBookStatusMsg.textContent = text;
+  if(type) editBookStatusMsg.classList.add(type);
+  void editBookStatusMsg.offsetWidth;
+  editBookStatusMsg.classList.add('show');
+}
+
+async function handleEditBookSubmit(){
+  const title = editBookTitleInput.value.trim();
+  if(!title){
+    showEditBookStatus('책 제목을 입력해주세요.', 'error');
+    return;
+  }
+  const author = editBookAuthorInput.value.trim();
+  const book = books.find(b => b.id === editingBookId);
+  if(!book) return;
+
+  editBookSubmitBtn.disabled = true;
+  try{
+    const oldNorm = normalizeTitle(book.title);
+    const newNorm = normalizeTitle(title);
+
+    book.title = title;
+    book.authors = author ? [author] : [];
+    book.coverUrl = pendingEditCoverDataUrl || '';
+
+    // 책 제목이 바뀌면, 이미 기록된 문장들이 참조하는 책 이름도 함께 갱신해서
+    // 기존 문장이 새 제목 아래에서 계속 보이도록 함 (그렇지 않으면 문장이 안 보이게 됨)
+    if(newNorm !== oldNorm){
+      groups.forEach(g => {
+        g.bookGroups.forEach(bg => {
+          if(normalizeTitle(bg.book) === oldNorm){
+            bg.book = title;
+          }
+        });
+      });
+    }
+
+    await saveAll();
+    closeEditBookSheet();
+    renderApp();
+  }catch(e){
+    console.error('책 수정 실패:', e);
+    showEditBookStatus('저장하지 못했습니다. 다시 시도해주세요.', 'error');
+  }finally{
+    editBookSubmitBtn.disabled = false;
+  }
+}
+editBookSubmitBtn.addEventListener('click', handleEditBookSubmit);
+editBookTitleInput.addEventListener('keydown', (e) => {
+  if(e.key === 'Enter'){ e.preventDefault(); handleEditBookSubmit(); }
+});
+editBookAuthorInput.addEventListener('keydown', (e) => {
+  if(e.key === 'Enter'){ e.preventDefault(); handleEditBookSubmit(); }
+});
+
+// ── AI 의미 분석 응답 파싱 (견고화 버전) ──────
+// Worker/Anthropic 응답이 여러 형태로 와도 최대한 안전하게 해석하고,
+// 실패하면 예외를 던져서 호출부가 "미분류 저장"으로 처리하게 함.
+async function parseClassificationResponse(response, quoteText){
+  const raw = await response.text();
+
+  if(!response.ok){
+    console.error('classifyQuote 응답 오류:', response.status, raw.slice(0, 300));
+    throw new Error(`API ${response.status}`);
+  }
+
+  let data;
+  try{
+    data = JSON.parse(raw);
+  }catch(e){
+    data = raw;
+  }
+
+  let candidate = data;
+  if(data && Array.isArray(data.content)){
+    const textBlock = data.content.find(item => item && item.type === 'text');
+    candidate = textBlock ? textBlock.text : null;
+  } else if(data && data.result){
+    candidate = data.result;
+  } else if(data && typeof data.text === 'string'){
+    candidate = data.text;
+  }
+
+  if(typeof candidate === 'string'){
+    const cleaned = candidate.replace(/```json/gi, '').replace(/```/g, '').trim();
+    const start = cleaned.indexOf('{');
+    const end = cleaned.lastIndexOf('}');
+    if(start !== -1 && end !== -1 && end > start){
+      try{
+        candidate = JSON.parse(cleaned.slice(start, end + 1));
+      }catch(e){
+        console.error('classifyQuote 파싱 실패, 원문 일부:', cleaned.slice(0, 300));
+        candidate = null;
+      }
+    } else {
+      candidate = null;
+    }
+  }
+
+  if(!candidate || typeof candidate !== 'object'){
+    console.error('classifyQuote 응답 형식을 알 수 없음, 원문 일부:', raw.slice(0, 300));
+    throw new Error('Invalid response format');
+  }
+
+  return {
+    matchedId: typeof candidate.matchedId === 'string' ? candidate.matchedId : null,
+    canonical: (typeof candidate.canonical === 'string' && candidate.canonical.trim())
+      ? candidate.canonical.trim()
+      : quoteText,
+    updatedCanonical: typeof candidate.updatedCanonical === 'string'
+      ? candidate.updatedCanonical.trim()
+      : ''
+  };
+}
+
+function representativeQuotes(g, limit = 4){
+  const all = [];
+  g.bookGroups.forEach(bg => bg.quotes.forEach(q => all.push(q.text)));
+  return all.slice(-limit);
+}
+
+async function classifyQuote(quoteText){
+  const existing = groups.map(g => ({
+    id: g.id,
+    canonical: g.canonical,
+    examples: representativeQuotes(g, 4)
+  }));
+
+  const systemPrompt = `당신은 문장의 의미를 분석해 유사한 인생 교훈/진리끼리 묶는 분류기입니다.
+사용자가 새 문장을 입력하면, 기존 그룹 목록(대표 문구 + 예시 문장들)과 의미가 사실상 같은 교훈을 말하는지 판단하세요.
+표현이 달라도 핵심 메시지가 같으면 매칭시킵니다 (예: "돈을 좇지 마라"와 "부를 추구하지 말라"는 같은 그룹). 예시 문장들과 새 문장이 실제로는 결이 다른 이야기라면 매칭시키지 마세요.
+매칭되는 그룹이 있다면, 그 그룹의 예시 문장들 + 새 문장을 모두 참고해서 그룹 전체 의미를 가장 잘 대표하는 대표 문구를 새로 다듬어 "updatedCanonical"에 담아주세요 (기존 canonical을 그대로 유지해도 되고 조금 더 정확하게 다듬어도 됩니다. 15자 내외 한국어).
+매칭되는 그룹이 없다면 matchedId를 null로 하고, 새 문장 자체를 대표하는 대표 문구를 "canonical"에 담아주세요.
+반드시 아래 JSON 형식으로만 응답하고 다른 텍스트는 절대 포함하지 마세요:
+{"matchedId": "기존 그룹 id 또는 null", "canonical": "새 그룹일 때 쓸 대표 문구", "updatedCanonical": "매칭된 그룹일 때 갱신할 대표 문구"}`;
+
+  const userPrompt = `기존 그룹 목록:
+${JSON.stringify(existing, null, 2)}
+
+새 문장: "${quoteText}"`;
+
+  const endpoint = IS_CLAUDE_ARTIFACT
+    ? "https://api.anthropic.com/v1/messages"
+    : WORKER_URL + "/classify";
+
+  const response = await fetch(endpoint, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      model: "claude-sonnet-4-6",
+      max_tokens: 1000,
+      system: systemPrompt,
+      messages: [{ role: "user", content: userPrompt }]
+    })
+  });
+
+  return await parseClassificationResponse(response, quoteText);
+}
+
+async function handleSubmit(){
+  const quoteText = quoteInput.value.trim();
+  if(!quoteText){
+    showStatus('기록할 문장을 적어주세요.', 'error');
+    return;
+  }
+
+  const currentBook = books.find(b => b.id === currentBookId);
+  if(!currentBook){
+    showStatus('먼저 책을 추가해주세요.', 'error');
+    return;
+  }
+  const book = currentBook.title;
+  const page = pageInput.value.trim();
+
+  submitBtn.disabled = true;
+  showStatus('문장을 기록하는 중입니다...', 'loading');
+
+  // 1) AI 의미 분석은 best-effort로 시도. 실패해도 아래 저장 로직은 항상 진행됨(문장 유실 방지).
+  let result = null;
+  try{
+    result = await classifyQuote(quoteText);
+  }catch(e){
+    console.error('classifyQuote 실패 (문장 저장은 계속 진행):', e && e.message);
+  }
+
+  // 2) 저장은 AI 성공 여부와 무관하게 항상 수행
+  try{
+    let targetId = null;
+
+    if(result && result.matchedId && groups.some(g => g.id === result.matchedId)){
+      const g = groups.find(g => g.id === result.matchedId);
+      const bookKey = normalizeTitle(book);
+      let bookGroup = g.bookGroups.find(bg => normalizeTitle(bg.book) === bookKey);
+
+      if(bookGroup){
+        bookGroup.quotes.push({ text: quoteText, page, ts: Date.now() });
+      } else {
+        bookGroup = { book, quotes: [{ text: quoteText, page, ts: Date.now() }] };
+        g.bookGroups.push(bookGroup);
+      }
+
+      g.count = g.bookGroups.length;
+      g.canonical = result.updatedCanonical || result.canonical || g.canonical;
+      targetId = g.id;
+    } else {
+      const newGroup = {
+        id: 'g_' + Date.now() + '_' + Math.random().toString(36).slice(2,7),
+        canonical: (result && result.canonical) || quoteText,
+        count: 1,
+        bookGroups: [{ book, quotes: [{ text: quoteText, page, ts: Date.now() }] }],
+        unclassified: !result
+      };
+      groups.push(newGroup);
+      targetId = newGroup.id;
+    }
+
+    await saveAll();
+    renderApp();
+
+    quoteInput.value = '';
+    autoResizeQuoteInput();
+    pageInput.value = '';
+
+    if(result){
+      setTimeout(() => {
+        closeQuoteSheet();
+        showToast('✓ 기록했습니다.');
+      }, 300);
+    } else {
+      showStatus('문장은 저장했지만 비슷한 생각을 찾지는 못했습니다.', 'error', 3000);
+      setTimeout(() => {
+        closeQuoteSheet();
+        showToast('✓ 기록했습니다.');
+      }, 900);
+    }
+  }catch(saveErr){
+    console.error('문장 저장 실패:', saveErr);
+    showStatus('문장을 저장하지 못했습니다. 잠시 후 다시 시도해주세요.', 'error');
+  }finally{
+    submitBtn.disabled = false;
+  }
+}
+
+submitBtn.addEventListener('click', handleSubmit);
+quoteInput.addEventListener('keydown', (e)=>{
+  if(e.key === 'Enter' && !e.shiftKey){
+    e.preventDefault();
+    handleSubmit();
+  }
+});
+pageInput.addEventListener('keydown', (e)=>{
+  if(e.key === 'Enter'){
+    e.preventDefault();
+    handleSubmit();
+  }
+});
+
+loadAll();
+</script>
+</body>
+</html>
