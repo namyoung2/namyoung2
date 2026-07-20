@@ -1,0 +1,1206 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>수집가들 — 좋은 문장은 다시 찾아옵니다</title>
+<link rel="stylesheet" as="style" crossorigin
+  href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.css" />
+<style>
+  :root{
+    --bg: #FFFFFF;
+    --surface: #FCFCFC;
+    --text: #181818;
+    --text-secondary: #666666;
+    --text-tertiary: #A0A0A0;
+    --border: #ECECEC;
+    --category-color: #C6F24E;
+    --compose-color: #C6F24E;
+    --hover: #F5F5F5;
+    --danger: #B23A2E;
+    --danger-soft: #F5E6E4;
+  }
+  *{ box-sizing: border-box; }
+  html,body{
+    margin:0; padding:0;
+    width: 100%;
+    max-width: 100%;
+    min-height: 100%;
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'Pretendard', -apple-system, BlinkMacSystemFont, "Segoe UI", "Apple SD Gothic Neo", sans-serif;
+    font-size: 15px;
+    -webkit-font-smoothing: antialiased;
+  }
+  body.modal-open{
+    overflow: hidden;
+    touch-action: none;
+  }
+
+  .wrap{
+    width: 100%;
+    max-width: 640px;
+    margin: 0 auto;
+    padding: max(28px, env(safe-area-inset-top)) 22px 120px;
+  }
+
+  /* ── 보관함 (카테고리별 문장 목록) - 메인 화면 ──── */
+  .archive-header{
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--text-tertiary);
+    text-align: center;
+    margin-bottom: 26px;
+  }
+  .archive-list{ max-width: 560px; margin: 0 auto; }
+
+  .quote-block{
+    position: relative;
+    padding: 20px 0;
+    cursor: pointer;
+  }
+  .quote-block:active{ background: var(--hover); }
+  .quote-block + .quote-block{
+    border-top: 1px solid var(--border);
+  }
+  .quote-text{
+    border-left: 4px solid var(--category-color);
+    padding-left: 14px;
+    font-size: 16px;
+    font-weight: 400;
+    line-height: 1.8;
+    color: var(--text);
+    margin: 0;
+    text-align: left;
+    word-break: keep-all;
+    overflow-wrap: break-word;
+  }
+  .quote-meta-line{
+    margin-top: 10px;
+    padding-left: 18px;
+    font-size: 12px;
+    color: var(--text-tertiary);
+  }
+  /* [3] 즐겨찾기 책갈피 - 세로 선과 같은 왼쪽 끝에서, 문장 바로 아래에 위치 */
+  .quote-bookmark-row{
+    margin-top: 8px;
+    line-height: 0;
+    color: var(--category-color);
+  }
+
+  .empty{
+    text-align:center;
+    padding: 64px 20px;
+    color: var(--text-tertiary);
+    font-size: 13.5px;
+    line-height: 1.9;
+  }
+  .empty-title{
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--text-secondary);
+  }
+
+  /* ── 하단 좌: 카테고리 세그먼트 탭 ──────────── */
+  .category-tabs{
+    position: fixed;
+    left: 20px;
+    bottom: max(20px, env(safe-area-inset-bottom));
+    display: flex;
+    gap: 2px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 999px;
+    padding: 4px;
+    box-shadow: 0 4px 14px rgba(24,24,24,0.1);
+    z-index: 70;
+  }
+  .category-tab{
+    border: none;
+    background: none;
+    border-radius: 999px;
+    padding: 9px 14px;
+    font-family: 'Pretendard', sans-serif;
+    font-size: 13.5px;
+    font-weight: 700;
+    color: var(--text-secondary);
+    cursor: pointer;
+    transition: background 0.15s ease, color 0.15s ease;
+  }
+  .category-tab.active{
+    background: var(--category-color);
+    color: var(--text);
+  }
+
+  /* ── 하단 우: + 버튼 ─────────────────────── */
+  .add-quote-trigger-btn{
+    position: fixed;
+    right: 20px;
+    bottom: max(20px, env(safe-area-inset-bottom));
+    width: 48px; height: 48px;
+    border-radius: 50%;
+    border: none;
+    background: var(--text);
+    color: #FFFFFF;
+    font-size: 22px;
+    display: flex; align-items: center; justify-content: center;
+    cursor: pointer;
+    box-shadow: 0 4px 14px rgba(24,24,24,0.22);
+    z-index: 70;
+  }
+  .add-quote-trigger-btn:active{ transform: scale(0.94); }
+
+  /* ── 확인 다이얼로그 ──────────────────────── */
+  .modal-overlay{
+    position: fixed;
+    inset: 0;
+    background: rgba(31,35,40,0.32);
+    display: none;
+    align-items: center;
+    justify-content: center;
+    padding: 20px;
+    z-index: 100;
+  }
+  .modal-overlay.open{ display: flex; }
+  .modal-box{
+    background: var(--surface);
+    border-radius: 14px;
+    width: 100%;
+    max-width: 440px;
+    box-shadow: 0 12px 32px rgba(31,35,40,0.16);
+    animation: fadeIn 0.18s ease;
+  }
+  .confirm-box{
+    max-width: 300px;
+    padding: 26px 22px 20px;
+  }
+  .confirm-message{
+    margin: 0 0 20px;
+    font-size: 14px;
+    line-height: 1.75;
+    color: var(--text);
+    text-align: center;
+  }
+  .confirm-actions{ display:flex; gap: 8px; }
+  .confirm-btn{
+    flex: 1;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 9px 0;
+    font-family: 'Pretendard', sans-serif;
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
+    background: var(--surface);
+  }
+  .confirm-cancel{ color: var(--text-secondary); }
+  .confirm-cancel:hover{ background: var(--hover); }
+  .confirm-ok{ color: var(--danger); border-color: var(--danger-soft); background: var(--danger-soft); }
+  .confirm-ok:hover{ background: #EBDAD6; }
+
+  @keyframes fadeIn{
+    from{ opacity: 0; transform: translateY(2px); }
+    to{ opacity: 1; transform: translateY(0); }
+  }
+
+  /* ── 중앙 Dialog 공통 ──────────────────────── */
+  .sheet-overlay{
+    position: fixed;
+    inset: 0;
+    background: rgba(24,24,24,0.28);
+    backdrop-filter: blur(4px);
+    -webkit-backdrop-filter: blur(4px);
+    display: none;
+    align-items: center;
+    justify-content: center;
+    padding: 16px;
+    z-index: 90;
+  }
+  .sheet-overlay.open{ display: flex; }
+  .bottom-sheet{
+    width: 100%;
+    max-width: 480px;
+    height: auto;
+    max-height: min(82dvh, 720px);
+    background: var(--surface);
+    border-radius: 20px;
+    box-shadow: 0 20px 50px rgba(24,24,24,0.18);
+    opacity: 0;
+    transform: scale(0.97) translateY(4px);
+    transition: opacity 0.2s ease, transform 0.2s ease;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    position: relative;
+  }
+  .sheet-overlay.open .bottom-sheet{
+    opacity: 1;
+    transform: scale(1) translateY(0);
+  }
+  .sheet-overlay.keyboard-open{
+    align-items: flex-start;
+    padding-top: 10px;
+  }
+  .sheet-overlay.keyboard-open .bottom-sheet{
+    max-height: calc(100% - 20px);
+    transform: none;
+  }
+  .sheet-title{
+    font-size: 14px;
+    font-weight: 700;
+    color: var(--text);
+    margin: 0 0 14px;
+  }
+  .sheet-body{
+    padding: 22px;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+  }
+
+  /* ── 문장 추가/수정 시트 공통 입력 요소 ────── */
+  .category-chip-row{
+    display: flex;
+    gap: 8px;
+    margin-bottom: 14px;
+  }
+  .category-chip{
+    flex: 1;
+    text-align: center;
+    border: 1px solid var(--border);
+    background: var(--bg);
+    border-radius: 10px;
+    padding: 10px 0;
+    font-family: 'Pretendard', sans-serif;
+    font-size: 13.5px;
+    font-weight: 600;
+    color: var(--text-secondary);
+    cursor: pointer;
+  }
+  .category-chip.active{
+    background: var(--compose-color);
+    border-color: var(--compose-color);
+    color: var(--text);
+  }
+
+  /* [1] 출처: 입력칸을 포커스하면 최근 사용한 출처가 바로 아래 드롭다운으로 나타남 */
+  .source-field-wrap{ position: relative; }
+  .source-suggest{
+    display: none;
+    position: absolute;
+    top: calc(100% - 8px);
+    left: 0; right: 0;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    box-shadow: 0 10px 24px rgba(24,24,24,0.14);
+    z-index: 5;
+    overflow: hidden;
+  }
+  .source-suggest.open{ display: block; }
+  .source-suggest-item{
+    display: block;
+    width: 100%;
+    text-align: left;
+    padding: 12px 14px;
+    background: none;
+    border: none;
+    border-bottom: 1px solid var(--border);
+    font-family: 'Pretendard', sans-serif;
+    font-size: 14px;
+    color: var(--text);
+    cursor: pointer;
+  }
+  .source-suggest-item:last-child{ border-bottom: none; }
+  .source-suggest-item:active{ background: var(--hover); }
+
+  /* [2] 페이지/일자 토글 + 전용 입력 */
+  .ref-field-row{
+    display: flex;
+    gap: 8px;
+    align-items: center;
+    margin-bottom: 12px;
+  }
+  .ref-mode-toggle{
+    flex-shrink: 0;
+    width: 36px;
+    height: 36px;
+    box-sizing: border-box;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border: 1px solid var(--border);
+    background: var(--bg);
+    border-radius: 8px;
+    padding: 0;
+    color: var(--text-secondary);
+    cursor: pointer;
+  }
+  .ref-mode-label{
+    flex-shrink: 0;
+    font-size: 12.5px;
+    font-weight: 600;
+    color: var(--text-secondary);
+    white-space: nowrap;
+  }
+  .ref-input{
+    flex: 1;
+    min-width: 0;
+    margin-bottom: 0 !important;
+  }
+  .add-book-input{
+    width: 100%;
+    height: 52px;
+    box-sizing: border-box;
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 0 14px;
+    font-family: 'Pretendard', sans-serif;
+    font-size: 16px;
+    color: var(--text);
+    outline: none;
+    margin-bottom: 12px;
+    background: var(--bg);
+  }
+  .add-book-input:focus{ border-color: var(--category-color); }
+  .quote-textarea{
+    width: 100%;
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 14px;
+    font-family: 'Pretendard', sans-serif;
+    font-size: 16px;
+    line-height: 1.65;
+    color: var(--text);
+    outline: none;
+    margin-bottom: 12px;
+    background: var(--bg);
+    resize: none;
+  }
+  .quote-textarea:focus{ border-color: var(--category-color); }
+  .quote-textarea::placeholder, .add-book-input::placeholder{ color: var(--text-tertiary); }
+
+  .cta-btn{
+    pointer-events: auto;
+    border: none;
+    border-radius: 999px;
+    font-family: 'Pretendard', sans-serif;
+    cursor: pointer;
+    transition: transform 0.15s ease, box-shadow 0.15s ease, background 0.15s ease;
+  }
+  .cta-primary{
+    background: var(--category-color);
+    color: var(--text);
+    font-size: 14px;
+    font-weight: 700;
+    padding: 14px 26px;
+    box-shadow: 0 3px 10px rgba(24,24,24,0.16);
+  }
+  .cta-primary:hover{ box-shadow: 0 4px 13px rgba(24,24,24,0.2); }
+  .cta-btn:active{ transform: scale(0.96); }
+  /* [2] 문장 작성 시트 안에서는 저장 버튼/포커스 테두리가 작성 시트 전용 미리보기 색(compose-color)을
+     따로 쓰도록 덮어씀 - 수정 시트나 보관함 화면의 색과는 완전히 분리되어 서로 영향을 주지 않음 */
+  #addQuoteOverlay .cta-primary{ background: var(--compose-color); }
+  #addQuoteOverlay .add-book-input:focus,
+  #addQuoteOverlay .quote-textarea:focus{ border-color: var(--compose-color); }
+  .add-book-submit{
+    width: 100%;
+    margin-top: 6px;
+    padding: 13px 0;
+  }
+  .add-book-submit:disabled{ opacity: 0.5; cursor: default; }
+
+  .status-msg{
+    font-size: 12px;
+    color: var(--text-secondary);
+    min-height: 0;
+    max-height: 0;
+    overflow: hidden;
+    opacity: 0;
+    transition: opacity 0.3s ease, max-height 0.3s ease, margin 0.3s ease;
+  }
+  .status-msg.show{
+    opacity: 1;
+    max-height: 30px;
+    margin-top: 8px;
+    margin-bottom: 8px;
+  }
+  .status-msg.error{ color: var(--danger); }
+
+  /* ── 저장 완료 토스트 ─────────────────────── */
+  .toast{
+    position: fixed;
+    top: max(20px, env(safe-area-inset-top));
+    left: 50%;
+    transform: translateX(-50%) translateY(-6px);
+    background: var(--category-color);
+    color: var(--text);
+    font-size: 12.5px;
+    font-weight: 600;
+    padding: 9px 18px;
+    border-radius: 999px;
+    box-shadow: 0 6px 18px rgba(24,24,24,0.2);
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.2s ease, transform 0.2s ease;
+    z-index: 200;
+    white-space: nowrap;
+  }
+  .toast.show{
+    opacity: 1;
+    transform: translateX(-50%) translateY(0);
+  }
+
+  /* ── 문장 ··· 액션 (아이폰 기본 선택 버튼/액션시트 스타일) ──── */
+  .ios-sheet-backdrop{
+    display: none;
+    position: fixed;
+    inset: 0;
+    background: rgba(24,24,24,0.32);
+    z-index: 96;
+    opacity: 0;
+    transition: opacity 0.2s ease;
+  }
+  .ios-sheet-backdrop.open{ display: block; opacity: 1; }
+  .ios-action-sheet{
+    position: fixed;
+    left: 12px; right: 12px;
+    bottom: max(12px, env(safe-area-inset-bottom));
+    z-index: 97;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    transform: translateY(100%);
+    opacity: 0;
+    transition: transform 0.22s cubic-bezier(0.32, 0.72, 0, 1), opacity 0.2s ease;
+    pointer-events: none;
+  }
+  .ios-action-sheet.open{
+    transform: translateY(0);
+    opacity: 1;
+    pointer-events: auto;
+  }
+  .ios-action-group{
+    background: var(--surface);
+    border-radius: 14px;
+    overflow: hidden;
+  }
+  .ios-action-item{
+    display: block;
+    width: 100%;
+    padding: 16px;
+    background: none;
+    border: none;
+    border-bottom: 1px solid var(--border);
+    font-family: 'Pretendard', sans-serif;
+    font-size: 16px;
+    color: var(--text);
+    text-align: center;
+    cursor: pointer;
+  }
+  .ios-action-item:last-child{ border-bottom: none; }
+  .ios-action-item:active{ background: var(--hover); }
+  .ios-action-item.danger{ color: var(--danger); }
+  .ios-action-item.cancel{ font-weight: 700; }
+
+  /* iOS Safari는 input/textarea의 font-size가 16px 미만이면 포커스 시 화면을 자동으로 확대함.
+     margin-bottom을 12px로 잡은 입력 필드들 폰트는 14~15.5px라 확대가 걸릴 수 있어
+     16px 미만 필드는 아래에서 별도로 보정함(선택 사항, 현재는 유지). */
+</style>
+</head>
+<body>
+
+<div class="wrap">
+  <div class="archive-header">보관함</div>
+  <div class="archive-list" id="archiveList"></div>
+</div>
+
+<div class="category-tabs" id="categoryTabs">
+  <button type="button" class="category-tab" data-cat="일">일</button>
+  <button type="button" class="category-tab" data-cat="관계">관계</button>
+  <button type="button" class="category-tab" data-cat="삶">삶</button>
+  <button type="button" class="category-tab" data-cat="사랑">사랑</button>
+</div>
+<button type="button" class="add-quote-trigger-btn" id="addQuoteTriggerBtn" title="문장 남기기">+</button>
+
+<!-- 문장 추가 시트 -->
+<div class="sheet-overlay" id="addQuoteOverlay">
+  <div class="bottom-sheet">
+    <div class="sheet-body">
+      <div class="sheet-title">문장 남기기</div>
+
+      <div class="category-chip-row" id="composeCategoryChips"></div>
+
+      <div class="source-field-wrap">
+        <input type="text" id="sourceInput" class="add-book-input" placeholder="출처를 입력하세요" autocomplete="off">
+        <div class="source-suggest" id="sourceSuggest"></div>
+      </div>
+
+      <textarea id="quoteTextInput" class="quote-textarea" placeholder="문장을 입력하세요" rows="4"></textarea>
+
+      <div class="ref-field-row">
+        <button type="button" class="ref-mode-toggle" id="refModeToggle" title="페이지/일자 전환"></button>
+        <span class="ref-mode-label" id="refModeLabel">페이지</span>
+        <input type="number" id="refPageInput" class="add-book-input ref-input" placeholder="페이지" inputmode="numeric" min="0">
+        <input type="date" id="refDateInput" class="add-book-input ref-input" style="display:none">
+      </div>
+
+      <div class="status-msg" id="addQuoteStatusMsg"></div>
+      <button class="cta-btn cta-primary add-book-submit" id="addQuoteSubmitBtn">저장하기</button>
+    </div>
+  </div>
+</div>
+
+<!-- 문장 수정 시트 -->
+<div class="sheet-overlay" id="editSheetOverlay">
+  <div class="bottom-sheet">
+    <div class="sheet-body">
+      <div class="sheet-title">문장 수정</div>
+
+      <div class="source-field-wrap">
+        <input type="text" id="editSourceInput" class="add-book-input" placeholder="출처를 입력하세요" autocomplete="off">
+        <div class="source-suggest" id="editSourceSuggest"></div>
+      </div>
+
+      <textarea id="editQuoteTextInput" class="quote-textarea" rows="4"></textarea>
+
+      <div class="ref-field-row">
+        <button type="button" class="ref-mode-toggle" id="editRefModeToggle" title="페이지/일자 전환"></button>
+        <span class="ref-mode-label" id="editRefModeLabel">페이지</span>
+        <input type="number" id="editRefPageInput" class="add-book-input ref-input" placeholder="페이지" inputmode="numeric" min="0">
+        <input type="date" id="editRefDateInput" class="add-book-input ref-input" style="display:none">
+      </div>
+
+      <div class="status-msg" id="editStatusMsg"></div>
+      <button class="cta-btn cta-primary add-book-submit" id="editSubmitBtn">저장하기</button>
+    </div>
+  </div>
+</div>
+
+<!-- 문장 ··· 액션 (즐겨찾기 / 수정 / 삭제) -->
+<div class="ios-sheet-backdrop" id="entryActionBackdrop"></div>
+<div class="ios-action-sheet" id="entryActionPopover">
+  <div class="ios-action-group">
+    <button class="ios-action-item" id="actionFavoriteBtn">즐겨찾기 추가</button>
+    <button class="ios-action-item" id="actionEditBtn">문장 수정</button>
+    <button class="ios-action-item danger" id="actionDeleteBtn">문장 삭제</button>
+  </div>
+  <div class="ios-action-group">
+    <button class="ios-action-item cancel" id="actionCancelBtn">취소</button>
+  </div>
+</div>
+
+<!-- 확인 다이얼로그 -->
+<div class="modal-overlay" id="confirmOverlay">
+  <div class="modal-box confirm-box">
+    <p class="confirm-message" id="confirmMessage"></p>
+    <div class="confirm-actions">
+      <button class="confirm-btn confirm-cancel" id="confirmCancel">취소</button>
+      <button class="confirm-btn confirm-ok" id="confirmOk">삭제</button>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toastMsg"></div>
+
+<script>
+const WORKER_URL = "https://truth-collector-proxy.dingapark1.workers.dev";
+
+// ⚠️ 보안 안내: 아래 SITE_SECRET은 이 HTML 파일 안에 평문으로 들어있습니다.
+// GitHub Pages에 올라간 순간 "누구나 페이지 소스에서 볼 수 있는 값"이 되므로,
+// 엄밀히는 "비밀"이 아니라 "약한 접근 제한 토큰" 정도로 취급해야 합니다.
+const SITE_SECRET = "my-cat-2026";
+
+const IS_CLAUDE_ARTIFACT = !!window.storage;
+const STORAGE_KEY = 'truth-groups'; // 기존 Worker/KV 키를 그대로 사용 (인프라 변경 없음)
+
+const storageAdapter = {
+  async get(key){
+    if(IS_CLAUDE_ARTIFACT){
+      try{ return await window.storage.get(key, false); }catch(e){ return null; }
+    }
+    try{
+      const res = await fetch(WORKER_URL + "/data", {
+        method: "GET",
+        headers: { "X-Site-Secret": SITE_SECRET }
+      });
+      if(!res.ok) return null;
+      const value = await res.text();
+      return { value };
+    }catch(e){
+      return null;
+    }
+  },
+  async set(key, value){
+    if(IS_CLAUDE_ARTIFACT){
+      return await window.storage.set(key, value, false);
+    }
+    try{
+      await fetch(WORKER_URL + "/data", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "X-Site-Secret": SITE_SECRET },
+        body: value
+      });
+    }catch(e){
+      return null;
+    }
+    return { key, value };
+  }
+};
+
+const CATEGORIES = ['일', '관계', '삶', '사랑'];
+
+// 카테고리별 시그니처 컬러 - 문장 왼쪽 선 + 현재 활성 탭에만 적용됨.
+// "+"/저장하기/토스트 같은 전역 요소는 카테고리와 무관하게 항상 같은 색(--accent)을 유지함.
+const CATEGORY_COLORS = {
+  '일': '#7FD8F0',
+  '관계': '#FFAB91',
+  '삶': '#C6F24E',
+  '사랑': '#FF9EC4'
+};
+function applyCategoryColor(){
+  document.documentElement.style.setProperty('--category-color', CATEGORY_COLORS[currentCategory] || CATEGORY_COLORS['삶']);
+}
+
+// sentences: { id, category, source, text, ref(페이지 또는 일자), important, ts }
+let sentences = [];
+let recentSources = [];
+let currentCategory = CATEGORIES[0];
+
+const archiveList = document.getElementById('archiveList');
+
+const categoryTabs = document.getElementById('categoryTabs');
+
+const addQuoteTriggerBtn = document.getElementById('addQuoteTriggerBtn');
+const addQuoteOverlay = document.getElementById('addQuoteOverlay');
+const composeCategoryChips = document.getElementById('composeCategoryChips');
+const sourceInput = document.getElementById('sourceInput');
+const sourceSuggest = document.getElementById('sourceSuggest');
+const quoteTextInput = document.getElementById('quoteTextInput');
+const refModeToggle = document.getElementById('refModeToggle');
+const refModeLabel = document.getElementById('refModeLabel');
+const refPageInput = document.getElementById('refPageInput');
+const refDateInput = document.getElementById('refDateInput');
+const addQuoteStatusMsg = document.getElementById('addQuoteStatusMsg');
+const addQuoteSubmitBtn = document.getElementById('addQuoteSubmitBtn');
+
+const editSheetOverlay = document.getElementById('editSheetOverlay');
+const editSourceInput = document.getElementById('editSourceInput');
+const editSourceSuggest = document.getElementById('editSourceSuggest');
+const editQuoteTextInput = document.getElementById('editQuoteTextInput');
+const editRefModeToggle = document.getElementById('editRefModeToggle');
+const editRefModeLabel = document.getElementById('editRefModeLabel');
+const editRefPageInput = document.getElementById('editRefPageInput');
+const editRefDateInput = document.getElementById('editRefDateInput');
+const editStatusMsg = document.getElementById('editStatusMsg');
+const editSubmitBtn = document.getElementById('editSubmitBtn');
+
+const entryActionBackdrop = document.getElementById('entryActionBackdrop');
+const entryActionPopover = document.getElementById('entryActionPopover');
+const actionFavoriteBtn = document.getElementById('actionFavoriteBtn');
+const actionEditBtn = document.getElementById('actionEditBtn');
+const actionDeleteBtn = document.getElementById('actionDeleteBtn');
+const actionCancelBtn = document.getElementById('actionCancelBtn');
+
+const confirmOverlay = document.getElementById('confirmOverlay');
+const confirmMessage = document.getElementById('confirmMessage');
+const confirmCancel = document.getElementById('confirmCancel');
+const confirmOk = document.getElementById('confirmOk');
+let confirmResolver = null;
+
+function escapeHtml(str){
+  const div = document.createElement('div');
+  div.textContent = str || '';
+  return div.innerHTML;
+}
+
+function genId(){
+  return 'q_' + Date.now() + '_' + Math.random().toString(36).slice(2, 7);
+}
+
+function showConfirm(message, okLabel){
+  confirmMessage.textContent = message;
+  confirmOk.textContent = okLabel || '삭제';
+  confirmOverlay.classList.add('open');
+  return new Promise((resolve) => {
+    confirmResolver = resolve;
+  });
+}
+function resolveConfirm(result){
+  confirmOverlay.classList.remove('open');
+  if(confirmResolver){
+    confirmResolver(result);
+    confirmResolver = null;
+  }
+}
+confirmOk.addEventListener('click', () => resolveConfirm(true));
+confirmCancel.addEventListener('click', () => resolveConfirm(false));
+confirmOverlay.addEventListener('click', (e) => {
+  if(e.target === confirmOverlay) resolveConfirm(false);
+});
+
+const toastEl = document.getElementById('toastMsg');
+let toastTimer = null;
+function showToast(text, ms){
+  clearTimeout(toastTimer);
+  toastEl.textContent = text;
+  void toastEl.offsetWidth;
+  toastEl.classList.add('show');
+  toastTimer = setTimeout(() => {
+    toastEl.classList.remove('show');
+  }, ms || 1400);
+}
+
+let statusTimer = null;
+function showStatus(el, text, type, autoHideMs){
+  clearTimeout(statusTimer);
+  el.classList.remove('error', 'show');
+  el.textContent = text;
+  if(type) el.classList.add(type);
+  void el.offsetWidth;
+  el.classList.add('show');
+  if(autoHideMs){
+    statusTimer = setTimeout(() => { el.classList.remove('show'); }, autoHideMs);
+  }
+}
+
+// ── 데이터 로드/저장 ───────────────────────────
+// [대개편] 예전엔 책(groups/books) 기준 구조였는데, 이제 카테고리(sentences 배열) 기준으로 바뀜.
+// 예전 구조가 KV에 남아있으면 이 브라우저의 localStorage에 안전하게 백업해두고, 새 구조로 새로 시작함.
+async function loadAll(){
+  try{
+    const res = await storageAdapter.get(STORAGE_KEY);
+    let parsed = res && res.value ? JSON.parse(res.value) : null;
+
+    if(parsed && Array.isArray(parsed.sentences)){
+      sentences = parsed.sentences;
+      recentSources = Array.isArray(parsed.recentSources) ? parsed.recentSources : [];
+    } else if(parsed && (Array.isArray(parsed.groups) || Array.isArray(parsed.books))){
+      // 예전(책 기반) 데이터 발견 → 로컬 백업 후 새 구조로 초기화
+      try{
+        const backupKey = 'truth-collector-backup-books-' + Date.now();
+        localStorage.setItem(backupKey, JSON.stringify(parsed));
+        console.log('예전 데이터를 로컬에 백업했습니다:', backupKey);
+      }catch(e){}
+      sentences = [];
+      recentSources = [];
+      await saveAll();
+      setTimeout(() => showToast('예전 책 데이터는 이 브라우저에 백업해뒀어요'), 500);
+    } else {
+      sentences = [];
+      recentSources = [];
+    }
+  }catch(e){
+    console.error('데이터 로드 실패:', e);
+    sentences = [];
+    recentSources = [];
+  }
+
+  currentCategory = loadLastCategory();
+  renderArchive();
+}
+
+async function saveAll(){
+  try{
+    await storageAdapter.set(STORAGE_KEY, JSON.stringify({ sentences, recentSources }));
+  }catch(e){
+    console.error('저장 실패:', e);
+    showToast('저장하지 못했습니다. 잠시 후 다시 시도해주세요.');
+  }
+}
+
+function loadLastCategory(){
+  try{
+    const saved = localStorage.getItem('truth-last-category');
+    if(CATEGORIES.includes(saved)) return saved;
+  }catch(e){}
+  return CATEGORIES[0];
+}
+function saveLastCategory(cat){
+  try{ localStorage.setItem('truth-last-category', cat); }catch(e){}
+}
+
+function addRecentSource(src){
+  src = (src || '').trim();
+  if(!src) return;
+  recentSources = [src, ...recentSources.filter(s => s !== src)].slice(0, 3);
+}
+
+// ── 보관함(카테고리별 문장 목록) 렌더링 ──────────
+function renderArchive(){
+  applyCategoryColor();
+  categoryTabs.querySelectorAll('.category-tab').forEach(tab => {
+    tab.classList.toggle('active', tab.dataset.cat === currentCategory);
+  });
+
+  const list = sentences
+    .filter(s => s.category === currentCategory)
+    .sort((a, b) => (b.ts || 0) - (a.ts || 0));
+
+  if(list.length === 0){
+    archiveList.innerHTML = `
+      <div class="empty">
+        <div class="empty-title">아직 남긴 문장이 없습니다.</div>
+      </div>`;
+    return;
+  }
+
+  const bookmarkSvg = '<svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor"><path d="M6 3a1 1 0 0 0-1 1v17l7-4.5 7 4.5V4a1 1 0 0 0-1-1H6z"/></svg>';
+
+  archiveList.innerHTML = list.map(s => {
+    const metaParts = [];
+    if(s.source) metaParts.push(escapeHtml(s.source));
+    if(s.ref) metaParts.push(escapeHtml(s.ref));
+    const metaLine = metaParts.join(' · ');
+    const bookmarkHtml = s.important ? `<div class="quote-bookmark-row" title="즐겨찾기">${bookmarkSvg}</div>` : '';
+    return `
+      <div class="quote-block" data-id="${s.id}">
+        <p class="quote-text">${escapeHtml(s.text)}</p>
+        ${bookmarkHtml}
+        ${metaLine ? `<div class="quote-meta-line">${metaLine}</div>` : ''}
+      </div>
+    `;
+  }).join('');
+
+  archiveList.querySelectorAll('.quote-block').forEach(block => {
+    block.addEventListener('click', () => openEntryAction(block.dataset.id));
+  });
+}
+
+// ── 카테고리 세그먼트 탭 (좌하단) ───────────────
+categoryTabs.querySelectorAll('.category-tab').forEach(tab => {
+  tab.addEventListener('click', () => {
+    if(tab.dataset.cat === currentCategory) return;
+    currentCategory = tab.dataset.cat;
+    saveLastCategory(currentCategory);
+    renderArchive();
+  });
+});
+
+// ── 문장 추가 시트 (우하단 +) ───────────────────
+let pendingComposeCategory = CATEGORIES[0];
+
+function renderCategoryChips(container, selected){
+  container.innerHTML = CATEGORIES.map(cat => `
+    <button type="button" class="category-chip ${cat === selected ? 'active' : ''}" data-cat="${cat}">${cat}</button>
+  `).join('');
+  container.querySelectorAll('.category-chip').forEach(btn => {
+    btn.addEventListener('click', () => {
+      pendingComposeCategory = btn.dataset.cat;
+      container.querySelectorAll('.category-chip').forEach(b => b.classList.toggle('active', b === btn));
+      // [2] 고른 카테고리에 맞춰 작성 시트 전용 색(compose-color)만 갱신함.
+      // 보관함/탭에 쓰이는 category-color는 절대 건드리지 않아서, 뒤에 깔린 화면 색이 같이 바뀌는 일이 없음.
+      document.documentElement.style.setProperty('--compose-color', CATEGORY_COLORS[pendingComposeCategory] || CATEGORY_COLORS['삶']);
+    });
+  });
+}
+
+// [1] 출처 입력칸을 포커스하면 최근 사용한 출처가 바로 아래 드롭다운으로 나타남.
+// mousedown에서 처리해야 input의 blur보다 먼저 실행되어 클릭이 씹히지 않음.
+function wireSourceSuggest(inputEl, suggestEl){
+  inputEl.addEventListener('focus', () => {
+    if(recentSources.length === 0) return;
+    suggestEl.innerHTML = recentSources.map(src => `
+      <button type="button" class="source-suggest-item">${escapeHtml(src)}</button>
+    `).join('');
+    suggestEl.querySelectorAll('.source-suggest-item').forEach((btn, i) => {
+      btn.addEventListener('mousedown', (e) => {
+        e.preventDefault();
+        inputEl.value = recentSources[i];
+        suggestEl.classList.remove('open');
+      });
+    });
+    suggestEl.classList.add('open');
+  });
+  inputEl.addEventListener('blur', () => {
+    setTimeout(() => suggestEl.classList.remove('open'), 150);
+  });
+}
+wireSourceSuggest(sourceInput, sourceSuggest);
+wireSourceSuggest(editSourceInput, editSourceSuggest);
+
+// [1,2] 페이지/일자 모드 토글 - 버튼은 항상 같은 크기의 아이콘만 담고, 어떤 모드인지는
+// 옆의 별도 텍스트로 보여줌 (그래야 "페이지"/"일자" 글자 길이가 달라도 버튼 크기가 안 흔들림)
+let addRefMode = 'page';
+let editRefMode = 'page';
+
+const REF_MODE_ICONS = {
+  page: '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="4" y1="9" x2="20" y2="9"/><line x1="4" y1="15" x2="20" y2="15"/><line x1="10" y1="3" x2="8" y2="21"/><line x1="16" y1="3" x2="14" y2="21"/></svg>',
+  date: '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>'
+};
+
+function applyRefMode(mode, toggleBtn, labelEl, pageInput, dateInput){
+  toggleBtn.innerHTML = REF_MODE_ICONS[mode];
+  labelEl.textContent = mode === 'page' ? '페이지' : '일자';
+  pageInput.style.display = mode === 'page' ? 'block' : 'none';
+  dateInput.style.display = mode === 'page' ? 'none' : 'block';
+}
+refModeToggle.addEventListener('click', () => {
+  addRefMode = addRefMode === 'page' ? 'date' : 'page';
+  applyRefMode(addRefMode, refModeToggle, refModeLabel, refPageInput, refDateInput);
+});
+editRefModeToggle.addEventListener('click', () => {
+  editRefMode = editRefMode === 'page' ? 'date' : 'page';
+  applyRefMode(editRefMode, editRefModeToggle, editRefModeLabel, editRefPageInput, editRefDateInput);
+});
+
+// 모드+입력값 → 저장용 문자열 ("51p" 또는 "2026.04.25")
+function buildRefString(mode, pageVal, dateVal){
+  if(mode === 'page'){
+    const v = (pageVal || '').trim();
+    return v ? `${v}p` : '';
+  }
+  return dateVal ? dateVal.replace(/-/g, '.') : '';
+}
+// 저장된 문자열 → 수정 시트를 열 때 모드+입력값 복원 (옛 형식/자유 입력도 최대한 추측해서 복원)
+function parseRefString(ref){
+  if(!ref) return { mode: 'page', page: '', date: '' };
+  const pageMatch = ref.match(/^(\d+)\s*p$/i);
+  if(pageMatch) return { mode: 'page', page: pageMatch[1], date: '' };
+  const dateMatch = ref.match(/^(\d{4})[.\-](\d{2})[.\-](\d{2})$/);
+  if(dateMatch) return { mode: 'date', page: '', date: `${dateMatch[1]}-${dateMatch[2]}-${dateMatch[3]}` };
+  const digits = ref.match(/\d+/);
+  return { mode: 'page', page: digits ? digits[0] : '', date: '' };
+}
+
+function openAddQuoteSheet(){
+  pendingComposeCategory = currentCategory;
+  document.documentElement.style.setProperty('--compose-color', CATEGORY_COLORS[pendingComposeCategory] || CATEGORY_COLORS['삶']);
+  renderCategoryChips(composeCategoryChips, pendingComposeCategory);
+  sourceInput.value = '';
+  quoteTextInput.value = '';
+  addRefMode = 'page';
+  refPageInput.value = '';
+  refDateInput.value = '';
+  applyRefMode(addRefMode, refModeToggle, refModeLabel, refPageInput, refDateInput);
+  addQuoteStatusMsg.classList.remove('show');
+  addQuoteOverlay.classList.add('open');
+  lockBodyScroll();
+  syncDialogViewport();
+  setTimeout(() => sourceInput.focus(), 250);
+}
+function closeAddQuoteSheet(){
+  if(document.activeElement && document.activeElement.blur) document.activeElement.blur();
+  addQuoteOverlay.classList.remove('open');
+  resetDialogViewport(addQuoteOverlay);
+  unlockBodyScroll();
+}
+addQuoteTriggerBtn.addEventListener('click', openAddQuoteSheet);
+addQuoteOverlay.addEventListener('click', (e) => {
+  if(e.target === addQuoteOverlay) closeAddQuoteSheet();
+});
+
+async function handleAddQuoteSubmit(){
+  const text = quoteTextInput.value.trim();
+  if(!text){
+    showStatus(addQuoteStatusMsg, '문장을 입력해주세요.', 'error', 1800);
+    return;
+  }
+  const source = sourceInput.value.trim();
+  const ref = buildRefString(addRefMode, refPageInput.value, refDateInput.value);
+
+  addQuoteSubmitBtn.disabled = true;
+
+  sentences.push({
+    id: genId(),
+    category: pendingComposeCategory,
+    source,
+    text,
+    ref,
+    important: false,
+    ts: Date.now()
+  });
+  if(source) addRecentSource(source);
+
+  await saveAll();
+  addQuoteSubmitBtn.disabled = false;
+  closeAddQuoteSheet();
+
+  currentCategory = pendingComposeCategory;
+  saveLastCategory(currentCategory);
+  renderArchive();
+  showToast('✓ 저장했어요');
+}
+addQuoteSubmitBtn.addEventListener('click', handleAddQuoteSubmit);
+quoteTextInput.addEventListener('keydown', (e) => {
+  if(e.key === 'Enter' && (e.metaKey || e.ctrlKey)){
+    e.preventDefault();
+    handleAddQuoteSubmit();
+  }
+});
+
+// ── 문장 ··· 액션 (즐겨찾기 / 수정 / 삭제) - 아이폰 기본 액션시트 ──
+let actionContext = null;
+
+function findSentence(id){
+  return sentences.find(s => s.id === id);
+}
+
+function openEntryAction(id){
+  actionContext = id;
+  const s = findSentence(id);
+  actionFavoriteBtn.textContent = (s && s.important) ? '즐겨찾기 해제' : '즐겨찾기 추가';
+  entryActionBackdrop.classList.add('open');
+  entryActionPopover.classList.add('open');
+}
+function closeEntryAction(){
+  entryActionBackdrop.classList.remove('open');
+  entryActionPopover.classList.remove('open');
+}
+entryActionBackdrop.addEventListener('click', closeEntryAction);
+actionCancelBtn.addEventListener('click', closeEntryAction);
+
+actionFavoriteBtn.addEventListener('click', async () => {
+  const id = actionContext;
+  closeEntryAction();
+  const s = findSentence(id);
+  if(!s) return;
+  s.important = !s.important;
+  await saveAll();
+  renderArchive();
+});
+
+actionEditBtn.addEventListener('click', () => {
+  const id = actionContext;
+  closeEntryAction();
+  if(id) openEditSheet(id);
+});
+
+actionDeleteBtn.addEventListener('click', async () => {
+  const id = actionContext;
+  closeEntryAction();
+  if(!id) return;
+  if(!(await showConfirm('이 문장을 삭제하시겠습니까?'))) return;
+  sentences = sentences.filter(s => s.id !== id);
+  await saveAll();
+  renderArchive();
+});
+
+// ── 문장 수정 시트 ─────────────────────────────
+let editContext = null;
+
+function openEditSheet(id){
+  const s = findSentence(id);
+  if(!s) return;
+  editContext = id;
+  editSourceInput.value = s.source || '';
+  editQuoteTextInput.value = s.text || '';
+
+  const parsed = parseRefString(s.ref);
+  editRefMode = parsed.mode;
+  editRefPageInput.value = parsed.page;
+  editRefDateInput.value = parsed.date;
+  applyRefMode(editRefMode, editRefModeToggle, editRefModeLabel, editRefPageInput, editRefDateInput);
+
+  editStatusMsg.classList.remove('show');
+  editSheetOverlay.classList.add('open');
+  lockBodyScroll();
+  syncDialogViewport();
+  setTimeout(() => editQuoteTextInput.focus(), 250);
+}
+function closeEditSheet(){
+  if(document.activeElement && document.activeElement.blur) document.activeElement.blur();
+  editSheetOverlay.classList.remove('open');
+  resetDialogViewport(editSheetOverlay);
+  unlockBodyScroll();
+}
+editSheetOverlay.addEventListener('click', (e) => {
+  if(e.target === editSheetOverlay) closeEditSheet();
+});
+
+async function handleEditSubmit(){
+  const id = editContext;
+  if(!id) return;
+  const s = findSentence(id);
+  if(!s) return;
+
+  const text = editQuoteTextInput.value.trim();
+  if(!text){
+    showStatus(editStatusMsg, '문장을 입력해주세요.', 'error', 1800);
+    return;
+  }
+  const source = editSourceInput.value.trim();
+
+  editSubmitBtn.disabled = true;
+  s.text = text;
+  s.source = source;
+  s.ref = buildRefString(editRefMode, editRefPageInput.value, editRefDateInput.value);
+  if(source) addRecentSource(source);
+
+  await saveAll();
+  editSubmitBtn.disabled = false;
+  closeEditSheet();
+  renderArchive();
+  showToast('✓ 수정했어요');
+}
+editSubmitBtn.addEventListener('click', handleEditSubmit);
+
+// ── ESC 키로 열려있는 Dialog 닫기 (PC) ──────────
+document.addEventListener('keydown', (e) => {
+  if(e.key !== 'Escape') return;
+  if(entryActionPopover.classList.contains('open')){ closeEntryAction(); return; }
+  const dialogs = [
+    { overlay: addQuoteOverlay, close: closeAddQuoteSheet },
+    { overlay: editSheetOverlay, close: closeEditSheet }
+  ];
+  const openDialog = dialogs.find(d => d.overlay.classList.contains('open'));
+  if(openDialog) openDialog.close();
+});
+
+// ── 중앙 Dialog가 visual viewport(키보드 열림 등) 안에 오도록 위치 보정 ──
+function syncDialogViewport(){
+  const vv = window.visualViewport;
+  if(!vv) return;
+  const keyboardOpen = window.innerHeight - vv.height > 150;
+  document.querySelectorAll('.sheet-overlay').forEach(overlay => {
+    overlay.style.top = `${vv.offsetTop}px`;
+    overlay.style.height = `${vv.height}px`;
+    overlay.style.bottom = 'auto';
+    overlay.classList.toggle('keyboard-open', keyboardOpen);
+  });
+}
+if(window.visualViewport){
+  window.visualViewport.addEventListener('resize', syncDialogViewport);
+  window.visualViewport.addEventListener('scroll', syncDialogViewport);
+}
+window.addEventListener('orientationchange', syncDialogViewport);
+['sourceInput', 'quoteTextInput', 'refPageInput', 'refDateInput', 'editSourceInput', 'editQuoteTextInput', 'editRefPageInput', 'editRefDateInput']
+  .forEach(id => {
+    const el = document.getElementById(id);
+    if(el) el.addEventListener('focus', syncDialogViewport);
+  });
+
+function resetDialogViewport(overlay){
+  overlay.style.top = '';
+  overlay.style.height = '';
+  overlay.style.bottom = '';
+  overlay.classList.remove('keyboard-open');
+}
+
+// ── 배경 스크롤 잠금 (Dialog 열림 중) ────────────
+let scrollLockCount = 0;
+let savedScrollY = 0;
+function lockBodyScroll(){
+  if(scrollLockCount === 0){
+    savedScrollY = window.scrollY || window.pageYOffset || 0;
+    document.body.style.position = 'fixed';
+    document.body.style.top = `-${savedScrollY}px`;
+    document.body.style.width = '100%';
+    document.body.classList.add('modal-open');
+  }
+  scrollLockCount++;
+}
+function unlockBodyScroll(){
+  scrollLockCount = Math.max(0, scrollLockCount - 1);
+  if(scrollLockCount === 0){
+    document.body.style.position = '';
+    document.body.style.top = '';
+    document.body.style.width = '';
+    document.body.classList.remove('modal-open');
+    window.scrollTo(0, savedScrollY);
+  }
+}
+
+loadAll();
+</script>
+</body>
+</html>
