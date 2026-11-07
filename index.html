@@ -1538,6 +1538,41 @@
     from{ opacity: 0; transform: translateY(12px); filter: blur(5px); }
     to{ opacity: 1; transform: none; filter: none; }
   }
+  /* ── 같이 읽으면 좋은 문장 칸 ── 높이를 0에서 내용만큼 부드럽게 펼침(grid 0fr→1fr) */
+  .related-panel{
+    display: grid;
+    grid-template-rows: 0fr;
+    opacity: 0;
+    transition: grid-template-rows 0.38s cubic-bezier(0.2, 0.8, 0.2, 1), opacity 0.3s ease;
+    cursor: default;
+  }
+  .related-panel.open{ grid-template-rows: 1fr; opacity: 1; }
+  .related-inner{ overflow: hidden; min-height: 0; }
+  .related-label{
+    margin: 18px 0 2px 18px;
+    font-size: 11.5px;
+    font-weight: 700;
+    color: var(--text-tertiary);
+  }
+  .related-item{
+    margin: 12px 0 0 18px;
+    padding-left: 14px;
+    border-left: 2px solid var(--category-color);
+  }
+  .related-text{
+    margin: 0;
+    font-size: 14px;
+    line-height: 1.7;
+    color: var(--text-secondary);
+    word-break: keep-all;
+  }
+  .related-comment{ margin-top: 4px; font-size: 12.5px; color: var(--text-tertiary); }
+  .related-meta{ margin-top: 4px; font-size: 11.5px; color: var(--text-tertiary); }
+  .related-status{ margin: 10px 0 2px 18px; font-size: 12.5px; color: var(--text-tertiary); }
+  .related-status.thinking{ animation: relatedPulse 1.2s ease-in-out infinite; }
+  @keyframes relatedPulse{ 0%,100%{ opacity: 0.45; } 50%{ opacity: 1; } }
+  .related-item.search-in{ animation-delay: calc(var(--i, 0) * 60ms + 80ms); }
+  body.search-active .quote-block{ cursor: pointer; }
   .search-near-label{
     font-size: 11.5px;
     font-weight: 700;
@@ -3909,6 +3944,8 @@ function applyViewMode(){
   updateComposeMemoState();
   if(memoScreenActive) openMemoCaptureScreen();
   if(composeActive) activateComposeBar();
+  // 보기↔편집을 오가면 보기 화면에서 펼쳐둔 "같이 읽으면 좋은 문장" 칸은 접음
+  try{ closeRelatedPanel(false); }catch(e){}
   if(wasSearchActive && !searchActive) resetSearchSilently();
   if(searchActive && !wasSearchActive) activateSearchBar();
 }
@@ -4930,6 +4967,7 @@ function renderArchive(){
     ? [spotlight, ...newOnes, ...rest, ...editedOnes]
     : [...newOnes, ...rest, ...editedOnes];
 
+  relatedOpenId = null; // 목록을 새로 그리면 펼쳐둔 칸은 사라짐
   archiveList.innerHTML = finalList.map(s => {
     const isSpotlight = spotlight && s.id === spotlight.id;
     return quoteBlockMarkup(s, { spotlightLabel: isSpotlight ? currentSpotlightMessage : '' });
@@ -5016,8 +5054,15 @@ archiveList.addEventListener('click', async (e) => {
   const sel = window.getSelection();
   if(sel && !sel.isCollapsed && sel.toString().trim()) return;
 
-  // 보기 모드에서는 고치는 메뉴를 아예 안 열고, 짧은 반응만 보여줌
+  // 보기 모드에서는 고치는 메뉴를 아예 안 염.
+  // PC: 문장을 누르면 그 아래로 "같이 읽으면 좋은 문장"이 펼쳐짐(잊고 있던 옛 문장으로 이어지게)
+  // 폰: 예전처럼 짧은 반응만
   if(viewMode === 'view'){
+    if(!HAS_ONSCREEN_KEYBOARD){
+      if(e.target.closest('.related-panel')) return; // 펼쳐진 칸 안을 누른 건 무시(접히지 않게)
+      toggleRelatedPanel(block);
+      return;
+    }
     const tapped = findSentence(block.dataset.id);
     if(tapped) showToast(pickTapReaction(tapped), 1400);
     return;
@@ -5787,6 +5832,7 @@ function renderSearchView(animate){
     archiveList.innerHTML = `<div class="search-empty-note${animate ? ' search-in' : ''}">${note}</div>`;
     return;
   }
+  relatedOpenId = null;
   let i = 0;
   const label = searchState.nearLabel
     ? `<div class="search-near-label${animate ? ' search-in' : ''}">가장 가까운 문장</div>` : '';
@@ -6110,6 +6156,139 @@ function writeSearchCache(key, sig, result){
     localStorage.setItem(SEARCH_CACHE_KEY, JSON.stringify(all));
   }catch(e){}
 }
+
+// ════════════════════════════════════════════════════════════════
+// ── 같이 읽으면 좋은 문장 (PC 보기 화면에서 문장을 누르면) ──────────
+// 누른 문장 아래로 칸이 스르륵 펼쳐지며, AI가 고른 "같이 읽으면 좋은 문장"을 최대 3개 보여줌.
+// 단어만 겹치는 건 빼고, 같은 상황에 도움이 되거나 생각을 이어가게 하는 것만.
+// 한 번 찾은 건 기억해둬서 다음엔 바로 뜸(문장이 바뀌면 새로 찾음).
+// ════════════════════════════════════════════════════════════════
+const RELATED_CACHE_KEY = 'soooo-related-cache';
+let relatedOpenId = null;
+let relatedReqId = 0;
+
+function closeRelatedPanel(animate){
+  const open = archiveList.querySelector('.related-panel');
+  relatedOpenId = null;
+  relatedReqId++;
+  if(!open) return;
+  const block = open.closest('.quote-block');
+  if(block) block.classList.remove('related-open');
+  if(!animate){ open.remove(); return; }
+  open.classList.remove('open');
+  setTimeout(() => open.remove(), 320);
+}
+function toggleRelatedPanel(block){
+  const id = block.dataset.id;
+  if(relatedOpenId === id){ closeRelatedPanel(true); return; }
+  closeRelatedPanel(true);
+  const s = findSentence(id);
+  if(!s) return;
+  relatedOpenId = id;
+  block.classList.add('related-open');
+  const panel = document.createElement('div');
+  panel.className = 'related-panel';
+  panel.innerHTML = `<div class="related-inner"><div class="related-label">같이 읽으면 좋은 문장</div><div class="related-body"><div class="related-status thinking">찾는 중이에요</div></div></div>`;
+  block.appendChild(panel);
+  requestAnimationFrame(() => requestAnimationFrame(() => panel.classList.add('open')));
+  loadRelated(s, panel);
+}
+function relatedPool(target){
+  return sentences.filter(x => x.id !== target.id && (x.text || '').trim() && x.text !== target.text);
+}
+function readRelatedCache(id, sig){
+  try{
+    const all = JSON.parse(localStorage.getItem(RELATED_CACHE_KEY) || '{}') || {};
+    const hit = all[id];
+    if(hit && hit.sig === sig && Date.now() - (hit.at || 0) < 14 * 86400000) return hit.ids;
+  }catch(e){}
+  return null;
+}
+function writeRelatedCache(id, sig, ids){
+  try{
+    const all = JSON.parse(localStorage.getItem(RELATED_CACHE_KEY) || '{}') || {};
+    all[id] = { sig, ids, at: Date.now() };
+    const keys = Object.keys(all).sort((a, b) => (all[b].at || 0) - (all[a].at || 0));
+    keys.slice(200).forEach(k => delete all[k]);
+    localStorage.setItem(RELATED_CACHE_KEY, JSON.stringify(all));
+  }catch(e){}
+}
+async function loadRelated(target, panel){
+  const reqId = ++relatedReqId;
+  const pool = relatedPool(target);
+  const sig = hashString((target.tagSig || tagSourceSig(target)) + '|' + searchDataSignature(pool));
+  const cached = readRelatedCache(target.id, sig);
+  if(cached){
+    setTimeout(() => { if(reqId === relatedReqId) renderRelated(panel, cached.filter(id => findSentence(id)), false); }, 120);
+    return;
+  }
+  const lines = pool.map((x, idx) => {
+    const tagged = Array.isArray(x.tags) && x.tags.length && x.tagWhen;
+    return [idx + 1, x.category || '', tagged ? x.tags.join(', ') : '', tagged ? x.tagWhen : '', compactForIndex(x.text, tagged ? 30 : 140)].join('|');
+  }).join('\n');
+  const prompt = `남영이 지금 읽고 있는 문장이야.
+문장: "${compactForIndex(target.text, 400).replace(/"/g, "'")}"${target.comment ? `\n남영의 생각: ${compactForIndex(target.comment, 200)}` : ''}${Array.isArray(target.tags) && target.tags.length ? `\n키워드: ${target.tags.join(', ')}` : ''}${target.tagWhen ? `\n이럴 때: ${target.tagWhen}` : ''}
+
+아래는 남영이 모아둔 다른 문장들이야. 한 줄에 하나씩: 번호|카테고리|키워드|이럴 때|문장 앞부분
+${lines}
+
+이 문장과 "같이 읽으면 좋은" 문장을 골라줘. 같은 상황에서 함께 도움이 되거나, 같은 생각을 다른 각도에서 이어가게 하는 문장이야.
+- 최대 3개, 잘 맞는 순서로. 같은 단어가 스치듯 겹치기만 하거나 억지로 이어지는 건 빼.
+- 마땅한 게 없으면 고르지 마. 엉뚱한 문장을 보여주느니 없는 게 나아.
+다른 설명 없이 딱 한 줄로만 답해: 번호: 3, 17 (없으면 번호: 없음)`;
+  let ids = null;
+  try{
+    const raw = await callClaude('search', prompt, 600, 30000, { temperature: 0 });
+    const m = raw.match(/번호\s*[:：]\s*(.*)/);
+    const line = m ? m[1] : (/^[\s\d,]+$/.test(raw.trim()) ? raw : '');
+    if(!m && !line && !/없/.test(raw)) throw new Error('형식');
+    const seen = new Set();
+    ids = ((line.match(/\d+/g)) || []).map(Number)
+      .map(n => pool[n - 1]).filter(x => x && !seen.has(x.id) && seen.add(x.id))
+      .slice(0, 3).map(x => x.id);
+  }catch(err){
+    console.warn('같이 읽을 문장 찾기 실패:', err);
+    ids = null;
+  }
+  if(reqId !== relatedReqId || !panel.isConnected) return;
+  if(ids === null){
+    renderRelatedStatus(panel, '지금은 못 찾아왔어요' + (lastAiErrorCode ? ` (${lastAiErrorCode})` : ''));
+    return;
+  }
+  writeRelatedCache(target.id, sig, ids);
+  renderRelated(panel, ids, true);
+}
+function renderRelatedStatus(panel, text){
+  const body = panel.querySelector('.related-body');
+  if(body) body.innerHTML = `<div class="related-status search-in">${escapeHtml(text)}</div>`;
+}
+function renderRelated(panel, ids, animate){
+  const body = panel.querySelector('.related-body');
+  if(!body) return;
+  const list = ids.map(id => findSentence(id)).filter(Boolean);
+  if(!list.length){ renderRelatedStatus(panel, '같이 읽을 만한 문장은 아직 없어요'); return; }
+  body.innerHTML = list.map((x, i) => {
+    const meta = [x.source, x.ref].filter(Boolean).map(escapeHtml).join(' · ');
+    return `<div class="related-item search-in" data-id="${x.id}" style="--category-color:${getCategoryColor(x.category)};--i:${i}">
+      <p class="related-text">${escapeHtml(x.text)}</p>
+      ${x.comment ? `<div class="related-comment">${escapeHtml(x.comment)}</div>` : ''}
+      ${meta ? `<div class="related-meta">${meta}</div>` : ''}
+    </div>`;
+  }).join('');
+  // 펼쳐진 칸이 입력줄 뒤로 숨지 않게, 필요하면 살짝 내려서 보여줌
+  setTimeout(() => {
+    const block = panel.closest('.quote-block');
+    if(block && panel.isConnected) block.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+  }, 380);
+}
+// Esc로 펼친 칸 접기(검색 결과를 접는 것보다 먼저)
+document.addEventListener('keydown', (e) => {
+  if(e.key !== 'Escape' || !relatedOpenId || e.defaultPrevented) return;
+  if(document.activeElement === searchBarInput) return;
+  if(passcodeOverlay.classList.contains('open') || document.querySelector('.sheet-overlay.open, .modal-overlay.open')) return;
+  e.preventDefault();
+  closeRelatedPanel(true);
+}, true);
 
 // AI의 답을 최대한 너그럽게 읽음 - 약속한 세 줄 형식이 기본이지만, JSON이나 마크다운이
 // 섞여 와도 한마디·번호를 뽑아냄(모델마다 말투가 조금씩 달라서 한 가지 모양만 믿으면 깨짐)
