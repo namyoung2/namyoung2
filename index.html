@@ -1437,7 +1437,11 @@
     justify-content: center;
     cursor: pointer;
   }
-  .compose-send-btn:active{ transform: scale(0.94); }
+  /* 눌림은 0.96(그보다 작으면 과장돼 보임), 손을 떼면 부드럽게 돌아오게 transition.
+     보이는 원은 30px이지만 누를 수 있는 범위는 40px로 넓힘 */
+  .compose-send-btn{ position: relative; transition: transform 0.15s ease-out, background-color 0.15s ease-out, color 0.15s ease-out; }
+  .compose-send-btn::after{ content: ''; position: absolute; left: 50%; top: 50%; width: 40px; height: 40px; transform: translate(-50%, -50%); }
+  .compose-send-btn:active{ transform: scale(0.96); }
   .compose-send-btn:disabled{ opacity: 0.5; cursor: default; }
   /* 화살표는 항상 고정 - 대신 "지금 눌러도 되는지"를 색으로만 알려줌.
      문장칸이 비어있으면(보낼 게 없으면) 회색으로 가라앉고, 뭔가 쓰면 카테고리 색으로
@@ -1483,7 +1487,7 @@
     color: var(--text-tertiary);
     white-space: nowrap;
     opacity: 0;
-    transition: opacity 0.2s ease;
+    transition: opacity 0.15s ease-out;
   }
   .search-bar-hint.show{ opacity: 1; }
   .search-bar-hint + .compose-send-btn{ margin-left: 0; }
@@ -1498,20 +1502,25 @@
     max-width: calc(100% - 24px);
     padding: 8px 16px;
     background: var(--surface);
-    border: 1px solid var(--border);
     border-radius: 999px;
-    box-shadow: 0 6px 18px rgba(24,24,24,0.08);
+    /* 테두리 대신 투명한 그림자 링 + 은은한 띄움 - 뒤로 문장이 지나가도 테두리 색이 튀지 않음 */
+    box-shadow: 0 0 0 1px rgba(0,0,0,0.06), 0 1px 2px -1px rgba(0,0,0,0.06), 0 6px 18px rgba(24,24,24,0.08);
     font-size: 13px;
     font-weight: 700;
     color: var(--text);
     white-space: nowrap;
     pointer-events: none;
     opacity: 0;
-    transform: translate(-50%, 8px) scale(0.97);
-    transition: opacity 0.32s ease, transform 0.42s cubic-bezier(0.2, 0.8, 0.2, 1);
+    transform: translate(-50%, 6px) scale(0.97);
+    /* 사라질 땐 짧고 조용하게(눈길을 뺏지 않게), 나타날 땐 조금 더 여유 있게 */
+    transition: opacity 0.16s ease-out, transform 0.16s ease-out;
   }
-  .search-voice.show{ opacity: 1; transform: translate(-50%, 0) scale(1); }
-  .search-voice-text{ overflow: hidden; text-overflow: ellipsis; transition: opacity 0.18s ease; }
+  .search-voice.show{
+    opacity: 1;
+    transform: translate(-50%, 0) scale(1);
+    transition: opacity 0.3s ease-out, transform 0.42s cubic-bezier(0.2, 0.8, 0.2, 1);
+  }
+  .search-voice-text{ overflow: hidden; text-overflow: ellipsis; transition: opacity 0.16s ease-out; }
   .search-voice.swapping .search-voice-text{ opacity: 0; }
   .search-voice.thinking{ color: var(--text-tertiary); font-weight: 600; }
   .search-voice-dot{
@@ -1526,8 +1535,9 @@
   @keyframes searchDotPulse{ 0%,100%{ opacity: 0.35; transform: scale(0.85); } 50%{ opacity: 1; transform: scale(1.1); } }
 
   /* 찾는 동안 기존 목록은 사라지지 않고 살짝 가라앉아 기다림 */
-  .archive-list{ transition: opacity 0.28s ease, filter 0.28s ease, transform 0.28s ease; }
-  .archive-list.search-waiting{ opacity: 0.35; filter: blur(1.5px); transform: translateY(4px); }
+  /* 흐림(blur)은 빼고 투명도만 - 흐린 글자는 "고장 난" 것처럼 보이고, 긴 목록 전체에 걸면 무겁기도 함 */
+  .archive-list{ transition: opacity 0.24s ease-out, transform 0.24s ease-out; }
+  .archive-list.search-waiting{ opacity: 0.4; }
   .archive-list.search-leaving{ opacity: 0; transform: translateY(6px); transition-duration: 0.16s; }
   /* 결과 문장이 위에서부터 하나씩, 흐릿한 상태에서 또렷해지며 살짝 올라옴 */
   .quote-block.search-in{
@@ -1538,15 +1548,23 @@
     from{ opacity: 0; transform: translateY(12px); filter: blur(5px); }
     to{ opacity: 1; transform: none; filter: none; }
   }
+  /* 글자를 칠 때마다 바뀌는 결과는 자주 일어나는 일이라 짧은 페이드만(차르륵은 AI 답에만) */
+  .search-empty-note.search-in{ animation: searchIn 0.45s cubic-bezier(0.2, 0.75, 0.2, 1) both; }
+  .quote-block.search-quick, .search-empty-note.search-quick{ animation: searchQuick 0.14s ease-out both; }
+  @keyframes searchQuick{ from{ opacity: 0; } to{ opacity: 1; } }
   /* ── 같이 읽으면 좋은 문장 칸 ── 높이를 0에서 내용만큼 부드럽게 펼침(grid 0fr→1fr) */
   .related-panel{
     display: grid;
     grid-template-rows: 0fr;
     opacity: 0;
-    transition: grid-template-rows 0.38s cubic-bezier(0.2, 0.8, 0.2, 1), opacity 0.3s ease;
+    transition: grid-template-rows 0.22s ease-out, opacity 0.16s ease-out; /* 접힐 땐 짧게 */
     cursor: default;
   }
-  .related-panel.open{ grid-template-rows: 1fr; opacity: 1; }
+  .related-panel.open{
+    grid-template-rows: 1fr;
+    opacity: 1;
+    transition: grid-template-rows 0.38s cubic-bezier(0.2, 0.8, 0.2, 1), opacity 0.3s ease-out;
+  }
   .related-inner{ overflow: hidden; min-height: 0; }
   .related-label{
     margin: 18px 0 2px 18px;
@@ -1565,30 +1583,26 @@
     line-height: 1.7;
     color: var(--text-secondary);
     word-break: keep-all;
+    text-wrap: pretty;
   }
-  .related-comment{ margin-top: 4px; font-size: 12.5px; color: var(--text-tertiary); }
+  .related-comment{ margin-top: 4px; font-size: 12.5px; color: var(--text-tertiary); text-wrap: pretty; }
   .related-meta{ margin-top: 4px; font-size: 11.5px; color: var(--text-tertiary); }
   .related-status{ margin: 10px 0 2px 18px; font-size: 12.5px; color: var(--text-tertiary); }
   .related-status.thinking{ animation: relatedPulse 1.2s ease-in-out infinite; }
   @keyframes relatedPulse{ 0%,100%{ opacity: 0.45; } 50%{ opacity: 1; } }
   .related-item.search-in{ animation-delay: calc(var(--i, 0) * 60ms + 80ms); }
   body.search-active .quote-block{ cursor: pointer; }
-  .search-near-label{
-    font-size: 11.5px;
-    font-weight: 700;
-    color: var(--text-tertiary);
-    padding: 4px 0 4px 18px;
-  }
-  .search-near-label.search-in{ animation: searchIn 0.45s ease both; }
   .search-empty-note{
     padding: 22vh 0 0;
     text-align: center;
   }
-  .search-empty-title{ font-size: 14px; font-weight: 700; color: var(--text-secondary); }
+  .search-empty-title{ font-size: 14px; font-weight: 700; color: var(--text-secondary); text-wrap: balance; }
   .search-empty-sub{ margin-top: 6px; font-size: 12.5px; color: var(--text-tertiary); }
   @media (prefers-reduced-motion: reduce){
-    .quote-block.search-in, .search-near-label.search-in{ animation: none; }
-    .archive-list, .search-voice{ transition: none; }
+    .quote-block.search-in, .related-item.search-in, .quote-block.search-quick,
+    .search-empty-note.search-quick, .search-voice.thinking .search-voice-dot,
+    .related-status.thinking{ animation: none; }
+    .archive-list, .search-voice, .search-voice.show, .related-panel, .related-panel.open{ transition: none; }
   }
 
 
@@ -5740,7 +5754,7 @@ composeBar.addEventListener('focusout', () => {
 // 한마디와 함께 문장을 골라줌. 한 번 묻고 한 번 답하는 구조(대화를 기억하진 않음).
 // ════════════════════════════════════════════════════════════════
 // mode: idle(평소 목록) | typing(글자 맞는 문장) | thinking(AI 기다리는 중) | answer | nomatch | error
-var searchState = { mode: 'idle', query: '', ids: [], reply: '', nearLabel: false, reqId: 0, lastLocalKey: '' };
+var searchState = { mode: 'idle', query: '', ids: [], reqId: 0, lastLocalKey: '', typingShown: false };
 
 function isSearchShowing(){
   if(!searchState || !document.body.classList.contains('search-active')) return false;
@@ -5829,16 +5843,16 @@ function renderSearchView(animate){
     const note = searchState.mode === 'typing'
       ? `<div class="search-empty-title">이 단어가 들어간 문장은 없어요</div><div class="search-empty-sub">Enter를 누르면 비슷한 뜻의 문장을 찾아볼게요</div>`
       : `<div class="search-empty-title">이 질문을 해결해 줄 좋은 문장이 아직 없어요</div><div class="search-empty-sub">언젠가 책에서 만나게 될 문장이에요</div>`;
-    archiveList.innerHTML = `<div class="search-empty-note${animate ? ' search-in' : ''}">${note}</div>`;
+    const cls = animate ? (searchState.mode === 'typing' ? ' search-quick' : ' search-in') : '';
+    archiveList.innerHTML = `<div class="search-empty-note${cls}">${note}</div>`;
     return;
   }
   relatedOpenId = null;
   let i = 0;
-  const label = searchState.nearLabel
-    ? `<div class="search-near-label${animate ? ' search-in' : ''}">가장 가까운 문장</div>` : '';
-  archiveList.innerHTML = label + list.map(s => {
-    const style = `--category-color:${getCategoryColor(s.category)}` + (animate ? `;--i:${Math.min(i++, 10)}` : '');
-    return quoteBlockMarkup(s, { extraClass: animate ? 'search-in' : '', style });
+  archiveList.innerHTML = list.map(s => {
+    const quick = animate && searchState.mode === 'typing'; // 글자 칠 때는 짧은 페이드만
+    const style = `--category-color:${getCategoryColor(s.category)}` + (animate && !quick ? `;--i:${Math.min(i++, 10)}` : '');
+    return quoteBlockMarkup(s, { extraClass: animate ? (quick ? 'search-quick' : 'search-in') : '', style });
   }).join('');
   archiveList.classList.remove('search-waiting', 'search-leaving');
   if(animate) scrollHostTo(0, 'instant');
@@ -5855,7 +5869,6 @@ function exitSearch(animate, keepInput){
   searchState.mode = 'idle';
   searchState.ids = [];
   searchState.query = '';
-  searchState.nearLabel = false;
   searchState.lastLocalKey = '';
   searchState.typingShown = false;
   if(!keepInput){
@@ -5896,7 +5909,6 @@ function resetSearchSilently(skipRender){
   searchState.mode = 'idle';
   searchState.ids = [];
   searchState.query = '';
-  searchState.nearLabel = false;
   searchState.lastLocalKey = '';
   searchState.typingShown = false;
   if(searchBarInput){
@@ -5945,7 +5957,6 @@ function handleSearchTyping(){
     // 글자로 맞는 게 없으면(질문처럼 길게 쓰는 중 등) 가운데에 "없어요 · Enter로 찾아볼게요" 안내
     const key = ids.length ? ids.join(',') : '(empty)';
     const changed = key !== searchState.lastLocalKey;
-    searchState.nearLabel = false;
     searchState.ids = ids;
     searchState.lastLocalKey = key;
     searchState.typingShown = true;
@@ -6101,7 +6112,6 @@ ${lines}
     const code = lastAiErrorCode ? ` (${lastAiErrorCode})` : '';
     searchState.mode = 'error';
     searchState.ids = ids;
-    searchState.nearLabel = false;
     showSearchVoice((ids.length ? '답을 못 받아서 글자로 찾았어요' : '지금은 답을 못 받아왔어요') + code, 'muted');
     if(ids.length) renderSearchView(true);
     else {
@@ -6118,8 +6128,6 @@ function applySearchResult(result){
   searchState.lastLocalKey = '';
   searchState.mode = result.weak ? 'nomatch' : 'answer';
   searchState.ids = result.ids;
-  searchState.reply = result.reply;
-  searchState.nearLabel = result.weak && result.ids.length > 0;
   const top = findSentence(result.ids[0]);
   showSearchVoice(result.reply, result.weak ? 'muted' : 'normal', top ? getCategoryColor(top.category) : '');
   renderSearchView(true);
@@ -6176,7 +6184,7 @@ function closeRelatedPanel(animate){
   if(block) block.classList.remove('related-open');
   if(!animate){ open.remove(); return; }
   open.classList.remove('open');
-  setTimeout(() => open.remove(), 320);
+  setTimeout(() => open.remove(), 240);
 }
 function toggleRelatedPanel(block){
   const id = block.dataset.id;
@@ -6324,7 +6332,8 @@ function parseSearchAnswer(raw){
 // 한 번 통한 모델은 기억해두고 다음부터 그걸 먼저 씀.
 const AI_MODEL_CANDIDATES = {
   search: ['claude-haiku-5-5', 'claude-haiku-4-5', 'claude-sonnet-4-6'],
-  tag: ['claude-sonnet-5-5', 'claude-sonnet-4-6']
+  tag: ['claude-sonnet-5-5', 'claude-sonnet-4-6'],
+  spell: ['claude-sonnet-4-6', 'claude-sonnet-5-5'] // 맞춤법은 지금까지 잘 되던 모델을 먼저
 };
 function rememberedModel(purpose){
   try{ return localStorage.getItem('soooo-ai-model-' + purpose) || ''; }catch(e){ return ''; }
@@ -7213,19 +7222,8 @@ ${JSON.stringify(payload)}
 설명, 번호, 마크다운 없이 이 형식의 줄들만 출력하세요 (문장 안에 큰따옴표나 특수문자가 있어도 그대로 쓰면 됩니다):
 id|||수정된 문장`;
 
-  const res = await fetch(WORKER_URL + '/classify', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      model: 'claude-sonnet-4-6',
-      max_tokens: 4000,
-      messages: [{ role: 'user', content: prompt }]
-    })
-  });
-
-  if(!res.ok) throw new Error('요청 실패: ' + res.status);
-  const data = await res.json();
-  const rawText = (data.content || []).map(b => b.text || '').join('');
+  // 검색·태그와 같은 호출 통로를 씀 - 모델이 사라지거나 바쁠 때 다음 후보로 넘어가고 한 번 더 시도함
+  const rawText = await callClaude('spell', prompt, 4000, 90000);
 
   const corrections = rawText
     .split('\n')
