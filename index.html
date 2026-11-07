@@ -1516,6 +1516,48 @@
     transition: opacity 0.15s ease-out;
   }
   .search-bar-hint.show{ opacity: 1; }
+  .cat-pill-count{ margin-left: 5px; font-weight: 600; color: var(--text-tertiary); font-variant-numeric: tabular-nums; }
+  .search-bar.searching .cat-pill-count{ display: none; }
+
+  /* PC 편집 화면 표시 - 로고 옆 작은 글자 하나로만(화면 분위기는 그대로) */
+  .settings-gear-btn{ position: relative; overflow: visible; }
+  .edit-mode-badge{
+    display: none;
+    position: absolute;
+    left: calc(100% + 6px);
+    top: 50%;
+    transform: translateY(-50%);
+    padding: 2px 8px;
+    border-radius: 999px;
+    background: var(--hover);
+    font-size: 11px;
+    font-weight: 700;
+    color: var(--text-tertiary);
+    white-space: nowrap;
+    line-height: 1.5;
+  }
+  body.compose-active .edit-mode-badge{ display: inline-block; }
+  @media (pointer: coarse){ .edit-mode-badge{ display: none !important; } }
+
+  /* PC 보기 화면: 마우스를 올리면 문장 뒤가 아주 옅게 칠해져 "눌러볼 수 있다"는 느낌
+     (누르면 같이 읽으면 좋은 문장이 펼쳐짐). 펼쳐둔 문장은 그 칠이 남아서 어느 문장의 것인지 보임 */
+  body.search-active .quote-block::before{
+    content: '';
+    position: absolute;
+    top: 6px; bottom: 6px;
+    left: -16px; right: -16px;
+    border-radius: 14px;
+    background: rgba(24,24,24,0.035);
+    opacity: 0;
+    transition: opacity 0.12s ease-out;
+    pointer-events: none;
+    z-index: -1;
+  }
+  body.search-active .quote-block{ z-index: 0; } /* 칠(::before)이 문장 바로 뒤에 깔리도록 문장마다 층을 만듦 */
+  body.search-active .quote-block:hover::before,
+  body.search-active .quote-block.related-open::before{ opacity: 1; }
+  body.search-active .quote-block.spotlight-card::before{ display: none; }
+  body.search-active .quote-block:active{ background: transparent; }
   .search-bar-hint + .compose-send-btn{ margin-left: 0; }
 
   .search-voice{
@@ -1962,7 +2004,22 @@
     z-index: 70;
     transition: background 0.2s ease, color 0.2s ease;
   }
-  .add-quote-trigger-btn:active{ transform: scale(0.94); }
+  .add-quote-trigger-btn:active{ transform: scale(0.96); }
+  .add-quote-trigger-btn{ transition: background 0.2s ease, color 0.2s ease, transform 0.15s ease-out; }
+  /* 폰 보기 화면: 아래 카테고리 알약·돋보기 뒤로 글자가 지나가며 어수선해 보이던 것을,
+     화면 맨 아래에 아주 옅은 흰 그라데이션을 깔아 정리함(버튼보다 아래 층, 터치는 통과) */
+  @media (pointer: coarse){
+    body.mode-view::before{
+      content: '';
+      position: fixed;
+      left: 0; right: 0;
+      bottom: 0;
+      height: calc(max(20px, env(safe-area-inset-bottom)) + 72px);
+      background: linear-gradient(to bottom, rgba(255,255,255,0), var(--bg) 70%);
+      pointer-events: none;
+      z-index: 69;
+    }
+  }
 
   /* 형광펜 하이라이트 - 카테고리 색과 무관하게 항상 통일된 노랑 */
   .quote-highlight{
@@ -2436,6 +2493,10 @@
     <!-- 톱니바퀴(PC 전용): 보기 화면에선 비밀번호 → 편집 화면, 편집 화면에선 설정 메뉴(보기 모드로/맞춤법/내보내기/가져오기) -->
     <button type="button" class="settings-gear-btn" id="settingsGearBtn" title="설정">
       <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+    
+      <!-- PC 편집 화면에서만 톱니바퀴 옆에 작게 "편집 중" - 보기 화면과 생김새가 거의 같아서 지금 "쓰는" 화면이라는 표시.
+           자리를 차지하지 않게(absolute) 띄워서, 화면을 오갈 때 로고 위치가 흔들리지 않음 -->
+      <span class="edit-mode-badge" aria-hidden="true">편집 중</span>
     </button>
   </div>
   <div class="archive-list" id="archiveList"></div>
@@ -2567,8 +2628,9 @@
         <span id="searchCatLabel"></span>
       </button>
       <span class="search-bar-hint" id="searchBarHint"></span>
-      <button type="button" class="compose-send-btn" id="searchSendBtn" title="물어보기 (Enter)">
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="19" x2="12" y2="5"/><polyline points="5 12 12 5 19 12"/></svg>
+      <!-- 보기 화면은 돋보기, 편집 화면은 ↑ - 버튼 모양만 봐도 지금 "찾는" 화면인지 "쓰는" 화면인지 알 수 있게 -->
+      <button type="button" class="compose-send-btn" id="searchSendBtn" title="물어보기 (Enter)" aria-label="물어보기">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="6.5"/><line x1="20" y1="20" x2="16" y2="16"/></svg>
       </button>
     </div>
   </div>
@@ -5484,9 +5546,14 @@ wireSourceSuggest(composeSourceInput, composeSourceSuggest);
 // 페이지는 문장마다 다른 경우가 많아 저장할 때마다 비움(잘못된 페이지가 조용히 남는 걸 막기 위해).
 let composeSource = '';
 
+// 알약에 카테고리 이름과 문장 수를 같이 보여줌(예: "관계 50") - 지금 어느 칸을 보고 있는지 한눈에
+function categoryPillHTML(name){
+  const n = sentences.filter(s => s.category === name).length;
+  return `${escapeHtml(name)}<span class="cat-pill-count">${n}</span>`;
+}
 function updateComposeCatPill(){
   composeCatDot.style.background = getCategoryColor(currentCategory);
-  composeCatLabel.textContent = currentCategory;
+  composeCatLabel.innerHTML = categoryPillHTML(currentCategory);
   // 보기 화면 검색줄의 알약도 같은 카테고리를 따라감(검색 중엔 "전체"로 따로 표시)
   if(typeof updateSearchCatPill === 'function') updateSearchCatPill();
 }
@@ -5861,7 +5928,7 @@ function updateSearchCatPill(){
     searchBar.classList.add('searching');
   } else {
     searchCatDot.style.background = getCategoryColor(currentCategory);
-    searchCatLabel.textContent = currentCategory;
+    searchCatLabel.innerHTML = categoryPillHTML(currentCategory);
     searchBar.classList.remove('searching');
   }
 }
@@ -5970,6 +6037,7 @@ function exitSearch(animate, keepInput){
   hideSearchVoice();
   setSearchHint('');
   updateSearchCatPill();
+  updateBrowseHint();
   if(!wasShowing){
     archiveList.classList.remove('search-waiting', 'search-leaving');
     return;
@@ -6077,8 +6145,16 @@ searchBar.addEventListener('focusin', () => searchBar.classList.add('compose-bar
 searchBar.addEventListener('focusout', () => {
   setTimeout(() => {
     if(!searchBar.contains(document.activeElement)) searchBar.classList.remove('compose-bar-focused');
+    updateBrowseHint();
   }, 0);
 });
+// 입력줄 밖(목록을 보는 중)이고 검색 중이 아닐 때만, 카테고리 넘기는 법을 작게 알려줌
+function updateBrowseHint(){
+  if(searchState.mode !== 'idle') return; // 검색 중엔 검색 힌트가 그 자리를 씀
+  const browsing = document.body.classList.contains('search-active') && !searchBar.contains(document.activeElement);
+  setSearchHint(browsing ? '← → 카테고리 · Tab 입력' : '');
+}
+searchBarInput.addEventListener('focus', updateBrowseHint);
 // 입력줄 밖(목록을 보는 중)에서도 Esc로 검색을 접을 수 있음
 document.addEventListener('keydown', (e) => {
   if(e.key !== 'Escape' || e.defaultPrevented || !document.body.classList.contains('search-active')) return;
