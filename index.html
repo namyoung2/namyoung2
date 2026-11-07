@@ -97,7 +97,11 @@
     background: var(--bg);
     display: flex;
     flex-direction: column;
-    overflow: hidden;
+    /* 글자·버튼은 지금처럼 "보이는 화면(dvh)" 안에 두고, 색 번짐 배경만 화면 위아래 밖까지
+       넉넉히 칠함(.splash-bg 참고). 아이폰 사파리는 상태바·아래 주소창 뒤까지 화면을 그리는데
+       dvh는 그 부분을 빼고 계산해서, 그 틈이 흰 띠로 보여 "화면에 꽉 안 찬" 것처럼 보였음.
+       (메모 화면도 같은 구조지만 배경이 흰색이라 틈이 안 보였던 것) */
+    overflow: visible;
   }
   /* 그냥 사라지는(opacity) 대신, 화면 전체가 위로 슥 밀려 올라가며 사라지게 함 -
      블라인드가 걷히는 듯한 "스와아아악" 느낌. 로고는 그 안에서 아주 살짝 더 빠르게
@@ -150,9 +154,13 @@
   /* ── 시작 화면 배경: 카테고리 4색이 뭉근하게 번진 추상 이미지 ────────── */
   .splash-bg{
     position: absolute;
-    inset: 0;
+    top: -160px;      /* 상태바 뒤까지 */
+    bottom: -160px;   /* 아래 주소창·홈 표시줄 뒤까지 */
+    left: 0;
+    right: 0;
     overflow: hidden;
     z-index: 0;
+    background: var(--bg);
   }
   /* 배경 전체가 손끝(마우스)을 따라 아주 살짝 기울어짐 - 만지면 반응한다는 걸
      과하지 않게 알려줌. 기울기 값은 JS가 --tiltx/--tilty로 넣어줌. */
@@ -2006,20 +2014,6 @@
   }
   .add-quote-trigger-btn:active{ transform: scale(0.96); }
   .add-quote-trigger-btn{ transition: background 0.2s ease, color 0.2s ease, transform 0.15s ease-out; }
-  /* 폰 보기 화면: 아래 카테고리 알약·돋보기 뒤로 글자가 지나가며 어수선해 보이던 것을,
-     화면 맨 아래에 아주 옅은 흰 그라데이션을 깔아 정리함(버튼보다 아래 층, 터치는 통과) */
-  @media (pointer: coarse){
-    body.mode-view::before{
-      content: '';
-      position: fixed;
-      left: 0; right: 0;
-      bottom: 0;
-      height: calc(max(20px, env(safe-area-inset-bottom)) + 72px);
-      background: linear-gradient(to bottom, rgba(255,255,255,0), var(--bg) 70%);
-      pointer-events: none;
-      z-index: 69;
-    }
-  }
 
   /* 형광펜 하이라이트 - 카테고리 색과 무관하게 항상 통일된 노랑 */
   .quote-highlight{
