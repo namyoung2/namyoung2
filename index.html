@@ -86,22 +86,18 @@
   .scroll-region{ width: 100%; }
 
   /* ── 시작 스플래시 화면 ─────────────────────── */
+  /* 폰 메모 화면(.memo-screen)과 똑같은 방식 - 그쪽이 아무 보정 없이도 화면을 정확히
+     채우고 있어서 같은 구조를 씀. 안에 내용을 세로로 쌓으므로 flex-direction: column. */
   .splash-overlay{
     position: fixed;
     inset: 0;
-    /* inset:0만으로는(위아래 이 위치에 맞춰 늘어나는 방식) 사파리가 페이지를 막 열어서
-       주소창이 아직 다 펼쳐진 채인 바로 그 순간엔 실제 보이는 높이와 다르게 계산될 때가
-       있음(사파리의 알려진 특성 - 이 앱에서 하단 탭이 겪던 문제와 같은 종류). 그래서
-       dvh로 명시적으로도 한 번 더 못박아, 지금 실제로 보이는 화면 높이에 맞춰지게 함. */
-    width: 100vw;
-    width: 100dvw;
-    height: 100vh;
+    height: 100vh;    /* dvh를 모르는 옛 브라우저용 */
     height: 100dvh;
     z-index: 500;
     background: var(--bg);
     display: flex;
-    align-items: center;
-    justify-content: center;
+    flex-direction: column;
+    overflow: hidden;
   }
   /* 그냥 사라지는(opacity) 대신, 화면 전체가 위로 슥 밀려 올라가며 사라지게 함 -
      블라인드가 걷히는 듯한 "스와아아악" 느낌. 로고는 그 안에서 아주 살짝 더 빠르게
@@ -244,20 +240,25 @@
       rgba(255,255,255,0.97) 62%,
       #FFFFFF 100%);
   }
+  /* absolute로 띄우지 않고 flex 흐름에 그대로 둠 - 메모 화면처럼 위에서부터 차곡차곡
+     쌓이게 해야 화면 높이가 바뀌어도 위아래가 안 잘림.
+     워드마크는 맨 위, 본문은 맨 아래(가운데 빈 공간은 아래 .splash-spacer가 밀어냄). */
   .splash-overlay .splash-wordmark{
-    position: absolute;
-    top: max(30px, env(safe-area-inset-top));
-    left: 26px;
+    position: relative;
     z-index: 4;
+    flex-shrink: 0;
+    margin: max(30px, env(safe-area-inset-top)) 0 0 26px;
     font-size: 15px;
     animation: splashPop 0.4s ease-out;
   }
   .splash-overlay .splash-wordmark-dot{ width: 8px; height: 8px; }
-  /* 본문은 아래쪽에 모아둠 - 위는 색, 아래는 읽을 것. 레퍼런스의 구조를 그대로 가져옴 */
+  /* 워드마크와 본문 사이를 밀어내는 빈 공간 - 화면이 커지든 작아지든 여기가 알아서 늘고 줆 */
+  .splash-spacer{ flex: 1; min-height: 0; }
+  /* 본문은 아래쪽에 - 위는 색, 아래는 읽을 것 */
   .splash-content{
-    position: absolute;
-    left: 0; right: 0; bottom: 0;
+    position: relative;
     z-index: 4;
+    flex-shrink: 0;
     padding: 0 26px max(30px, env(safe-area-inset-bottom));
     animation: splashRise 0.5s cubic-bezier(.22,1,.36,1) 0.1s backwards;
   }
@@ -363,7 +364,9 @@
     color: var(--text-tertiary);
     cursor: pointer;
   }
-  body.compose-active .settings-gear-btn{ display: flex; }
+  /* PC에선 늘 보임 - 보기 화면에선 "편집으로 들어가기", 편집 화면에선 "설정 메뉴" */
+  body.compose-active .settings-gear-btn,
+  body.search-active .settings-gear-btn{ display: flex; }
   /* 폰(터치 기기)엔 아예 안 둠 - 메모 기능 외엔 필요 없다고 하셨음(설정은 PC 전용) */
   @media (pointer: coarse){ .settings-gear-btn{ display: none !important; } }
   .settings-gear-btn:hover{ background: var(--hover); color: var(--text-secondary); }
@@ -973,11 +976,12 @@
      잡으면(즉 화면 위에서부터 거리를 재면), 주소창이 어떻게 움직이든 그 계산에 전혀
      휘둘리지 않음 - 사파리에서 위쪽 기준은 항상 안정적이기 때문. 판의 높이를 JS로
      맞출 필요도, 매 프레임 따라갈 필요도 없어짐. */
+  /* 안의 탭·+버튼이 각자 직접 position:fixed로 화면에 붙으므로, 이 판은 이제
+     클릭이 뒤로 통하게 해주는 껍데기 역할만 함(높이를 맞출 필요가 없어짐). */
   .float-layer{
     position: fixed;
     left: 0; right: 0;
     top: 0;
-    height: 100dvh;
     pointer-events: none;
     z-index: 70;
   }
@@ -1422,6 +1426,110 @@
   }
   /* 폰에는 이 채팅줄 자체가 없음 - 폰의 편집 모드는 완전히 다른(메모) 화면이라 */
   @media (pointer: coarse){ .compose-bar{ display: none !important; } }
+  /* ── PC 보기 화면: 검색 입력줄 + AI 한마디 ─────────────────────
+     편집 화면 입력줄의 클래스를 그대로 써서 모양은 같고, 여기선 레이아웃만 공유함. */
+  body.search-active .search-bar{ display: block; }
+  /* 같은 .compose-bar 클래스를 쓰므로, 편집 화면(compose-active)에서 같이 떠버리지 않게 확실히 막음 */
+  body:not(.search-active) .search-bar{ display: none !important; }
+  body.search-active .category-tabs{ display: none; }
+  body.search-active{ overflow: hidden; }
+  body.search-active .scroll-region{
+    height: calc(100vh - var(--compose-reserve, 160px));
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    scrollbar-width: none;
+    -ms-overflow-style: none;
+  }
+  body.search-active .scroll-region::-webkit-scrollbar{ display: none; }
+  body.search-active .compose-top-fade{ display: block; }
+  body.search-active .add-quote-trigger-btn{ opacity: 0; pointer-events: none; }
+  body.search-active.search-empty .search-bar .compose-send-btn{
+    background: var(--border);
+    color: var(--text-tertiary);
+  }
+  /* 검색 중엔 카테고리 구분 없이 전체에서 찾으므로 알약도 "전체"로, 색 없이 */
+  .search-bar.searching .compose-cat-pill{ pointer-events: none; }
+  .search-bar.searching .compose-cat-dot{ background: var(--text-tertiary) !important; }
+  .search-bar-hint{
+    margin-left: auto;
+    margin-right: 10px;
+    font-size: 12px;
+    color: var(--text-tertiary);
+    white-space: nowrap;
+    opacity: 0;
+    transition: opacity 0.2s ease;
+  }
+  .search-bar-hint.show{ opacity: 1; }
+  .search-bar-hint + .compose-send-btn{ margin-left: 0; }
+
+  .search-voice{
+    position: absolute;
+    left: 50%;
+    bottom: calc(100% + 12px);
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    max-width: calc(100% - 24px);
+    padding: 8px 16px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 999px;
+    box-shadow: 0 6px 18px rgba(24,24,24,0.08);
+    font-size: 13px;
+    font-weight: 700;
+    color: var(--text);
+    white-space: nowrap;
+    pointer-events: none;
+    opacity: 0;
+    transform: translate(-50%, 8px) scale(0.97);
+    transition: opacity 0.32s ease, transform 0.42s cubic-bezier(0.2, 0.8, 0.2, 1);
+  }
+  .search-voice.show{ opacity: 1; transform: translate(-50%, 0) scale(1); }
+  .search-voice-text{ overflow: hidden; text-overflow: ellipsis; transition: opacity 0.18s ease; }
+  .search-voice.swapping .search-voice-text{ opacity: 0; }
+  .search-voice.thinking{ color: var(--text-tertiary); font-weight: 600; }
+  .search-voice-dot{
+    flex-shrink: 0;
+    width: 7px; height: 7px;
+    border-radius: 50%;
+    background: var(--category-color);
+    transition: background 0.3s ease;
+  }
+  .search-voice.muted .search-voice-dot{ background: var(--text-tertiary); }
+  .search-voice.thinking .search-voice-dot{ animation: searchDotPulse 1s ease-in-out infinite; background: var(--text-tertiary); }
+  @keyframes searchDotPulse{ 0%,100%{ opacity: 0.35; transform: scale(0.85); } 50%{ opacity: 1; transform: scale(1.1); } }
+
+  /* 찾는 동안 기존 목록은 사라지지 않고 살짝 가라앉아 기다림 */
+  .archive-list{ transition: opacity 0.28s ease, filter 0.28s ease, transform 0.28s ease; }
+  .archive-list.search-waiting{ opacity: 0.35; filter: blur(1.5px); transform: translateY(4px); }
+  .archive-list.search-leaving{ opacity: 0; transform: translateY(6px); transition-duration: 0.16s; }
+  /* 결과 문장이 위에서부터 하나씩, 흐릿한 상태에서 또렷해지며 살짝 올라옴 */
+  .quote-block.search-in{
+    animation: searchIn 0.55s cubic-bezier(0.2, 0.75, 0.2, 1) both;
+    animation-delay: calc(var(--i, 0) * 45ms);
+  }
+  @keyframes searchIn{
+    from{ opacity: 0; transform: translateY(12px); filter: blur(5px); }
+    to{ opacity: 1; transform: none; filter: none; }
+  }
+  .search-near-label{
+    font-size: 11.5px;
+    font-weight: 700;
+    color: var(--text-tertiary);
+    padding: 4px 0 4px 18px;
+  }
+  .search-near-label.search-in{ animation: searchIn 0.45s ease both; }
+  .search-empty-note{
+    padding: 60px 0;
+    text-align: center;
+    font-size: 13px;
+    color: var(--text-tertiary);
+  }
+  @media (prefers-reduced-motion: reduce){
+    .quote-block.search-in, .search-near-label.search-in{ animation: none; }
+    .archive-list, .search-voice{ transition: none; }
+  }
+
 
   /* 채팅줄이 뜬 상태에선 이 버튼(우하단 +/검색)이 할 일이 없음 - 문장 추가는 채팅줄이,
      하이라이트는 이제 별도의 플로팅 툴바(.highlight-float-btn)가 담당함. 그냥 완전히 숨김. */
@@ -1510,16 +1618,14 @@
   /* ── 하단 좌: 카테고리 세그먼트 탭 ──────────── */
   /* 판(.float-layer)이 JS로 정확히 "지금 보이는 화면"에 맞춰지므로, 그 안에서는
      absolute로 판의 바닥에 붙이기만 하면 됨 */
-  /* [핵심] bottom이 아니라 top 기준으로 잡음 - 아래에서부터 재면 사파리 주소창이
-     움직일 때마다 그 계산이 흔들리는데, 위에서부터 재면 전혀 영향을 안 받음.
-     기준값 100svh는 "주소창이 다 펼쳐진, 가장 작은 화면 높이" - 이 높이를 기준으로
-     삼으면 주소창이 나타나 화면이 줄어들어도 탭이 잘리지 않고, 주소창이 사라져
-     화면이 커지면 탭이 그만큼 바닥에서 살짝 떠 보일 뿐 절대 요동치지 않음. */
+  /* 화면 아래에 딱 붙어서, 주소창이 나타나고 사라질 때마다 그만큼 같이 움직임.
+     한때 top: 100svh 기준으로 고정해둔 적이 있는데(요동침을 막으려고), 그러면 주소창이
+     사라져 화면이 커져도 탭이 제자리에 남아 아래가 휑하게 비었음 - 실제로 써보니 그게
+     더 불편해서, 브라우저가 알아서 따라가게 하는 bottom 기준으로 되돌림. */
   .category-tabs{
-    position: absolute;
+    position: fixed;
     left: 20px;
-    top: calc(100vh - 66px - max(0px, env(safe-area-inset-bottom)));   /* svh를 모르는 옛 브라우저용 */
-    top: calc(100svh - 66px - max(0px, env(safe-area-inset-bottom)));
+    bottom: max(20px, env(safe-area-inset-bottom));
     display: flex;
     gap: 2px;
     background: var(--surface);
@@ -1740,10 +1846,9 @@
 
   /* ── 하단 우: + 버튼 ─────────────────────── */
   .add-quote-trigger-btn{
-    position: absolute;
+    position: fixed;
     right: 20px;
-    top: calc(100vh - 68px - max(0px, env(safe-area-inset-bottom)));   /* svh를 모르는 옛 브라우저용 */
-    top: calc(100svh - 68px - max(0px, env(safe-area-inset-bottom)));
+    bottom: max(20px, env(safe-area-inset-bottom));
     width: 48px; height: 48px;
     border-radius: 50%;
     border: none;
@@ -2192,6 +2297,8 @@
     <span>soooo.zip</span>
   </div>
 
+  <div class="splash-spacer"></div>
+
   <div class="splash-content" id="splashInner">
     <div class="splash-stats" id="splashStats">
       <!-- 짧은 한마디가 위, 큰 문장이 아래. 반대로 두면 굵은 두 줄 밑에 한 줄이 달랑
@@ -2206,7 +2313,7 @@
     <div class="splash-empty" id="splashEmpty">
       <div class="splash-line">첫 문장을<br>기다리고 있어요</div>
     </div>
-    <button type="button" class="splash-btn" id="splashBtn">계속하기</button>
+    <button type="button" class="splash-btn" id="splashBtn">입장하기</button>
   </div>
 </div>
 
@@ -2225,7 +2332,7 @@
       <!-- 평소엔 완전히 안 보이다가, 서버 재시도를 기다리는 동안에만 아주 작게 나타남 -->
       <span class="sync-pending-dot" id="syncDot" title="아직 서버에 반영 안 됨 - 곧 다시 시도해요"></span>
     </button>
-    <!-- 톱니바퀴는 편집 모드에서만 뜸(가끔 쓰는 기능들 - 보기 모드로/맞춤법/내보내기/가져오기) -->
+    <!-- 톱니바퀴(PC 전용): 보기 화면에선 비밀번호 → 편집 화면, 편집 화면에선 설정 메뉴(보기 모드로/맞춤법/내보내기/가져오기) -->
     <button type="button" class="settings-gear-btn" id="settingsGearBtn" title="설정">
       <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
     </button>
@@ -2337,6 +2444,32 @@
       <svg class="send-icon-arrow" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="19" x2="12" y2="5"/><polyline points="5 12 12 5 19 12"/></svg>
     </button>
   </div>
+  </div>
+</div>
+
+<!-- PC 보기 화면 전용: 검색 입력줄. 편집 화면의 입력줄과 똑같은 모양(같은 클래스)이라
+     두 화면이 한 앱처럼 이어져 보이고, 하는 일만 다름(여기는 찾기, 편집은 문장 추가).
+     글자를 치면 맞는 문장이 바로 걸러지고, Enter를 누르면 AI가 한마디와 함께 골라줌. -->
+<div class="compose-bar search-bar" id="searchBar">
+  <!-- AI의 한마디 - 입력줄 바로 위에 작게 떠서 "물어본 것에 답하는" 자리에 놓임 -->
+  <div class="search-voice" id="searchVoice" aria-live="polite">
+    <span class="search-voice-dot" id="searchVoiceDot"></span>
+    <span class="search-voice-text" id="searchVoiceText"></span>
+  </div>
+  <div class="compose-bar-inner">
+    <div class="compose-input-row">
+      <textarea id="searchBarInput" class="compose-textarea" placeholder="어떤 문장이 필요해요?" rows="1" autocomplete="off"></textarea>
+    </div>
+    <div class="compose-status-row">
+      <button type="button" class="compose-cat-pill" id="searchCatPill" title="카테고리 바꾸기">
+        <span class="compose-cat-dot" id="searchCatDot"></span>
+        <span id="searchCatLabel"></span>
+      </button>
+      <span class="search-bar-hint" id="searchBarHint"></span>
+      <button type="button" class="compose-send-btn" id="searchSendBtn" title="물어보기 (Enter)">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="19" x2="12" y2="5"/><polyline points="5 12 12 5 19 12"/></svg>
+      </button>
+    </div>
   </div>
 </div>
 
@@ -2500,24 +2633,10 @@ const SKIP_SPLASH = !window.matchMedia('(pointer: coarse)').matches;
   if(el) el.style.display = 'none';
 })();
 
-(function pinSplashHeight(){
-  const splash = document.getElementById('splashOverlay');
-  if(!splash || !window.visualViewport) return;
-  const vv = window.visualViewport;
-  // 높이만이 아니라 "화면 위쪽 기준점"까지 같이 맞춰야 함 - 사파리에서 주소창이 걸쳐
-  // 있는 동안엔 fixed의 top:0이 실제 보이는 화면의 맨 위와 어긋나서, 스플래시가 위아래
-  // 양쪽으로 조금씩 못 미치고 그 틈으로 뒤 콘텐츠가 비쳐 보였음(첫 화면 캡처로 확인).
-  const apply = () => {
-    // 사라지는 애니메이션(.hide)이 시작되면 손을 뗌 - 그 애니메이션도 transform을 쓰기
-    // 때문에, 여기서 계속 덮어쓰면 서로 밀치면서 튀어 보임
-    if(splash.classList.contains('hide')) return;
-    splash.style.transform = 'translateY(' + Math.round(vv.offsetTop) + 'px)';
-    splash.style.height = Math.round(vv.height) + 'px';
-  };
-  apply();
-  vv.addEventListener('resize', apply);
-  vv.addEventListener('scroll', apply);
-})();
+// 시작 화면의 높이·위치는 순수 CSS(inset:0 + 100dvh)만으로 맞춤 - 폰 메모 화면이
+// 바로 그 방식으로 아무 문제 없이 화면을 꽉 채우고 있어서 같은 방식을 그대로 씀.
+// 예전엔 여기서 visualViewport를 읽어 transform·height를 직접 넣었는데, 그게 오히려
+// 화면을 아래로 밀어내면서 위아래가 잘려 보였음(실제 폰 캡처로 확인).
 
 // 로고 이미지 하나를 파비콘·스플래시·헤더 세 군데에서 다 쓰는데, 예전엔 이 base64 데이터를
 // 세 번 그대로 박아넣어서 파일 크기가 쓸데없이 3배가 됐었음. 한 번만 적어두고 JS로 세 곳에 나눠 붙임.
@@ -2714,6 +2833,16 @@ const composeEditRow = document.getElementById('composeEditRow');
 const composeEditCancelBtn = document.getElementById('composeEditCancelBtn');
 // 컴퓨터 편집 모드 전용 채팅형 입력줄
 const composeBar = document.getElementById('composeBar');
+const searchBar = document.getElementById('searchBar');
+const searchBarInput = document.getElementById('searchBarInput');
+const searchBarHint = document.getElementById('searchBarHint');
+const searchSendBtn = document.getElementById('searchSendBtn');
+const searchCatPill = document.getElementById('searchCatPill');
+const searchCatDot = document.getElementById('searchCatDot');
+const searchCatLabel = document.getElementById('searchCatLabel');
+const searchVoice = document.getElementById('searchVoice');
+const searchVoiceText = document.getElementById('searchVoiceText');
+const searchVoiceDot = document.getElementById('searchVoiceDot');
 const composeCatPill = document.getElementById('composeCatPill');
 const composeCatDot = document.getElementById('composeCatDot');
 const composeCatLabel = document.getElementById('composeCatLabel');
@@ -3107,6 +3236,7 @@ async function loadAll(){
         local.deletedMemoIds.forEach(id => deletedMemoIds.add(id));
         local.deletedSentenceIds.forEach(id => deletedSentenceIds.add(id));
         unionInto(categoryLoadedSnapshotNames, local.seenCategoryNames);
+        Object.entries(local.baseHashes).forEach(([id, h]) => { if(!sentenceBaseHashes.has(id)) sentenceBaseHashes.set(id, h); });
 
         // 서버 데이터가 내 로컬 백업보다 최신인지 판단함 - 최신일 때만 "서버에 없으면
         // 다른 기기에서 지운 것"이라는 규칙을 적용해서, 옛 응답을 보고 내 메모를
@@ -3117,6 +3247,7 @@ async function loadAll(){
           : true;
 
         const mergedSentences = mergeWithServer(serverSentences, local.sentences);
+        rememberSentenceBase(serverSentences); // 이제부터의 기준은 방금 받은 서버 모습
         const mergedMemos = mergeMemosWithServer(serverMemos, local.memos);
         const mergedCategories = mergeCategoriesWithServer(serverCategories, local.categories);
         const stillUnsynced =
@@ -3138,6 +3269,7 @@ async function loadAll(){
         memos = serverMemos;
         categories = serverCategories;
         recentSources = serverSources;
+        rememberSentenceBase(serverSentences);
       }
     } else if(parsed && (Array.isArray(parsed.groups) || Array.isArray(parsed.books))){
       // 예전(책 기반) 데이터 발견 → 로컬 백업 후 새 구조로 초기화
@@ -3203,7 +3335,9 @@ async function loadAll(){
   viewMode = 'view';
   applyViewMode();
   renderArchive();
-  if(!HAS_ONSCREEN_KEYBOARD) openPasscodeSheet();
+  // PC도 이제 비밀번호 없이 곧장 보기(검색) 화면으로 들어감 - 편집은 톱니바퀴로.
+  // 그동안 쌓인 "아직 태그가 없는 문장"은 조용히 뒤에서 정리함(PC에서만)
+  scheduleTagQueue(3000);
 }
 
 // 서버의 최신 문장 목록과 지금 이 브라우저의 문장 목록을 병합함.
@@ -3214,15 +3348,82 @@ async function loadAll(){
 //   삭제한 것이므로 되살리지 않음
 let deletedMemoIds = new Set();
 let deletedSentenceIds = new Set();
+
+// ── 같은 문장을 두 기기가 갖고 있을 때 "누구 걸 쓸지" ─────────────
+// 예전엔 무조건 "이 기기에 있는 것"이 이겼음. 그런데 그러면 한 기기에서 고친 내용
+// (수정·코멘트·하이라이트·AI 태그, 디스코드에서 남긴 메모 등)이, 옛 내용을 들고 있던
+// 다른 기기가 저장하는 순간 조용히 옛날로 되돌아감 - 폰은 문장을 읽기만 해도
+// ("봤다" 기록) 저장을 하니까 특히 잘 일어났음.
+// 그래서 "마지막으로 서버와 맞춰봤을 때의 모습"(기준)을 문장마다 지문(해시)으로 기억해두고,
+//  - 이 기기 쪽이 기준에서 안 바뀌었고 서버 쪽만 바뀌었으면 → 서버 것을 씀(다른 기기의 수정)
+//  - 이 기기 쪽만 바뀌었으면 → 이 기기 것을 씀(내 수정)
+//  - 둘 다 바뀌었으면 → 예전처럼 이 기기 것(드문 경우)
+// "봤다" 기록(lastSeenAt)은 내용이 아니라서 지문에서 빼고, 둘 중 더 최근 값을 씀.
+let sentenceBaseHashes = new Map(); // id → 마지막으로 서버와 맞춰봤을 때의 지문
+function stableStringify(v){
+  if(v === null || typeof v !== 'object') return JSON.stringify(v === undefined ? null : v);
+  if(Array.isArray(v)) return '[' + v.map(stableStringify).join(',') + ']';
+  return '{' + Object.keys(v).filter(k => v[k] !== undefined).sort().map(k => JSON.stringify(k) + ':' + stableStringify(v[k])).join(',') + '}';
+}
+function hashString(str){
+  // FNV-1a 32비트 - 보안용이 아니라 "바뀌었는지" 알아보는 지문용이라 이걸로 충분함
+  let h = 0x811c9dc5;
+  for(let i = 0; i < str.length; i++){
+    h ^= str.charCodeAt(i);
+    h = Math.imul(h, 0x01000193);
+  }
+  return (h >>> 0).toString(36) + '.' + str.length.toString(36);
+}
+function sentenceContentHash(s){
+  const { lastSeenAt, ...rest } = s;
+  return hashString(stableStringify(rest));
+}
+function rememberSentenceBase(list){
+  list.forEach(s => sentenceBaseHashes.set(s.id, sentenceContentHash(s)));
+}
+let mergeTookServerEdits = false; // 이번 병합에서 다른 기기의 수정을 받아들였는지(화면을 다시 그릴지 판단)
+function pickSentenceVersion(local, server){
+  const lh = sentenceContentHash(local);
+  const sh = sentenceContentHash(server);
+  let chosen = local;
+  if(lh === sh){
+    sentenceBaseHashes.set(local.id, sh); // 이미 같은 모습 - 이게 새 기준
+  } else {
+    const bh = sentenceBaseHashes.get(local.id);
+    if(bh === undefined){
+      // 기준이 없음(이 기능이 생기기 전 백업) - 서버가 더 최신일 때만 서버 것을 믿음
+      if(serverDataIsFresh) chosen = server;
+    } else if(lh === bh){
+      chosen = server; // 내 쪽은 그대로인데 서버만 바뀜 → 다른 기기에서 고친 것
+    }
+    // sh === bh(내 쪽만 바뀜) 또는 둘 다 바뀜 → 내 것 유지
+  }
+  const seenA = local.lastSeenAt || 0, seenB = server.lastSeenAt || 0;
+  if(chosen === server){
+    // 서버 모습을 받아들였으니 이제 둘은 같은 상태 - 기준도 같이 옮겨둠. 안 그러면 저장이 실패해
+    // 기준이 안 바뀐 채로 남았을 때, 방금 받아들인 걸 "내가 고친 것"으로 착각해서 그 뒤에 온
+    // 다른 기기의 수정을 덮어써버림(테스트에서 잡힌 경우)
+    sentenceBaseHashes.set(local.id, sh);
+    mergeTookServerEdits = true;
+    chosen = { ...server };
+    if(seenA > seenB) chosen.lastSeenAt = seenA;
+  } else if(seenB > seenA){
+    chosen.lastSeenAt = seenB;
+  }
+  return chosen;
+}
+
 function mergeWithServer(serverSentences, localSentences){
   const merged = [];
   const seen = new Set();
   const serverIds = new Set(serverSentences.map(s => s.id));
+  const serverById = new Map(serverSentences.map(s => [s.id, s]));
   localSentences.forEach(s => {
     if(deletedSentenceIds.has(s.id)) return; // 다른 기기에서 지운 것 → 이 기기 백업에 남아있어도 걸러냄
     // 메모와 같은 규칙 - 전에 서버와 맞춰본 적 있는데 지금 서버에 없으면 다른 기기에서 지운 것
     if(serverDataIsFresh && loadedSnapshotIds.has(s.id) && !serverIds.has(s.id)) return;
-    merged.push(s);
+    const sv = serverById.get(s.id);
+    merged.push(sv ? pickSentenceVersion(s, sv) : s);
     seen.add(s.id);
   });
   serverSentences.forEach(s => {
@@ -3251,6 +3452,7 @@ let memoLoadedSnapshotIds = new Set();
 // 옛것일 수도 있는데(클라우드 저장소는 방금 쓴 값이 곧바로 안 보일 때가 있음) 무턱대고
 // 지워버리면, 방금 이 기기에서 만든 메모가 사라지는 훨씬 더 나쁜 사고가 남.
 let serverDataIsFresh = false;
+let serverEditsPendingRender = false;
 function mergeMemosWithServer(serverMemos, localMemos){
   const merged = [];
   const seen = new Set();
@@ -3329,7 +3531,9 @@ function writeLocalBackup(){
       seenMemoIds: Array.from(memoLoadedSnapshotIds),
       seenCategoryNames: Array.from(categoryLoadedSnapshotNames),
       deletedMemoIds: Array.from(deletedMemoIds),
-      deletedSentenceIds: Array.from(deletedSentenceIds)
+      deletedSentenceIds: Array.from(deletedSentenceIds),
+      // 문장마다 "마지막으로 서버와 맞춰봤을 때의 지문" - 다른 기기의 수정을 알아보는 기준
+      baseHashes: Object.fromEntries(sentenceBaseHashes)
     }));
   }catch(e){
     console.error('로컬 백업 저장 실패:', e);
@@ -3354,7 +3558,8 @@ function readLocalBackup(){
       seenMemoIds: Array.isArray(parsed.seenMemoIds) ? parsed.seenMemoIds : [],
       seenCategoryNames: Array.isArray(parsed.seenCategoryNames) ? parsed.seenCategoryNames : [],
       deletedMemoIds: Array.isArray(parsed.deletedMemoIds) ? parsed.deletedMemoIds : [],
-      deletedSentenceIds: Array.isArray(parsed.deletedSentenceIds) ? parsed.deletedSentenceIds : []
+      deletedSentenceIds: Array.isArray(parsed.deletedSentenceIds) ? parsed.deletedSentenceIds : [],
+      baseHashes: (parsed.baseHashes && typeof parsed.baseHashes === 'object') ? parsed.baseHashes : {}
     };
   }catch(e){
     return null;
@@ -3387,7 +3592,10 @@ async function saveAllInner(){
         // 서버에 쌓인 삭제 이력을 먼저 합침 - 다른 기기가 없앤 것을 여기서 되살리지 않게
         if(Array.isArray(parsed.deletedMemoIds)) parsed.deletedMemoIds.forEach(id => deletedMemoIds.add(id));
         if(Array.isArray(parsed.deletedSentenceIds)) parsed.deletedSentenceIds.forEach(id => deletedSentenceIds.add(id));
+        mergeTookServerEdits = false;
         sentences = mergeWithServer(parsed.sentences, sentences);
+        // 다른 기기에서 고친 걸 받아들였다면, 저장이 끝난 뒤 화면에도 보여줘야 함
+        if(mergeTookServerEdits) serverEditsPendingRender = true;
         memos = mergeMemosWithServer(Array.isArray(parsed.memos) ? parsed.memos : [], memos);
         categories = mergeCategoriesWithServer(
           (Array.isArray(parsed.categories) && parsed.categories.length) ? parsed.categories : DEFAULT_CATEGORIES.map(c => ({ ...c })),
@@ -3416,6 +3624,8 @@ async function saveAllInner(){
       savedAt: Date.now()
     };
     if(serverBackup) payload.backup = serverBackup;
+    // 지금 올리는 모습의 지문 - 저장이 성공하면 이게 새 기준이 됨(올리는 사이에 또 바뀐 건 다음 저장 몫)
+    const uploadedHashes = sentences.map(s => [s.id, sentenceContentHash(s)]);
 
     const result = await storageAdapter.set(STORAGE_KEY, JSON.stringify(payload));
     // set()이 null을 돌려주면 서버가 실제로는 거부한 것 - 여태 이 값을 확인 안 해서
@@ -3423,6 +3633,7 @@ async function saveAllInner(){
     // 실제로는 서버에 하나도 안 남아있던 문제의 진짜 원인)
     if(!result) throw new Error('서버가 저장을 거부함');
     lastLocalSaveAt = Date.now();
+    uploadedHashes.forEach(([id, h]) => sentenceBaseHashes.set(id, h));
     unionInto(loadedSnapshotIds, sentences.map(s => s.id));
     unionInto(memoLoadedSnapshotIds, memos.map(m => m.id));
     unionInto(categoryLoadedSnapshotNames, categories.map(c => c.name));
@@ -3432,6 +3643,12 @@ async function saveAllInner(){
     // 배열 자체는 이미 최신이라), 만에 하나 있을 극단적인 경우까지 확실히 막기 위해
     // 최종 스냅샷으로 한 번 더 덮어써 둠.
     writeLocalBackup();
+    if(serverEditsPendingRender){
+      serverEditsPendingRender = false;
+      renderArchive();
+    }
+    // 새로 쓰거나 고친 문장이 있으면 검색용 꼬리표를 뒤에서 조용히 붙임(PC에서만, 없으면 아무 일도 안 함)
+    scheduleTagQueue(4000);
     // 이전에 실패해서 재시도를 기다리고 있던 상태였다면, 이번엔 성공했으니 그 상태를 풀어줌
     if(hasUnsyncedChanges){
       setUnsyncedState(false);
@@ -3557,6 +3774,7 @@ async function pollForUpdates(){
     // 문장도 마찬가지로 병합함 - 예전엔 서버 값을 그대로 대입해서, 방금 지운 문장이
     // 최종 일관성 지연으로 되살아날 수 있는 같은 위험이 있었음.
     const mergedSentences = mergeWithServer(parsed.sentences, sentences);
+    rememberSentenceBase(parsed.sentences);
     sentences = mergedSentences;
     recentSources = Array.isArray(parsed.recentSources) ? parsed.recentSources : [];
     unionInto(loadedSnapshotIds, parsed.sentences.map(s => s.id));
@@ -3655,12 +3873,18 @@ function applyViewMode(){
   // (예전엔 overflow만 잠갔는데 아이폰 사파리에선 그게 안 통했음)
   if(memoScreenActive && !wasMemoScreen) lockBodyScroll();
   else if(!memoScreenActive && wasMemoScreen) unlockBodyScroll();
+  // PC 보기 화면 = 검색 화면: 편집 화면과 같은 자리에 같은 모양의 입력줄이 뜸(하는 일만 찾기)
+  const searchActive = !HAS_ONSCREEN_KEYBOARD && viewMode === 'view';
+  const wasSearchActive = document.body.classList.contains('search-active');
   document.body.classList.toggle('compose-active', composeActive);
-  document.documentElement.classList.toggle('compose-active-html', composeActive);
+  document.body.classList.toggle('search-active', searchActive);
+  document.documentElement.classList.toggle('compose-active-html', composeActive || searchActive);
   updateFabForMode();
   updateComposeMemoState();
   if(memoScreenActive) openMemoCaptureScreen();
   if(composeActive) activateComposeBar();
+  if(wasSearchActive && !searchActive) resetSearchSilently();
+  if(searchActive && !wasSearchActive) activateSearchBar();
 }
 // 화면 전체가 아주 잠깐 흐려졌다 돌아오고, 우하단 아이콘이 통통 튀듯 바뀜 - "다른 모드로 넘어갔다"는
 // 느낌만 은은하게 주는 정도. 페이지가 뒤집히거나 하는 과한 연출은 톤이랑 안 맞아서 피함.
@@ -3680,7 +3904,8 @@ function playModeSwitchAnim(skipPageAnim){
   // 이 튀는 연출이 opacity를 강제로 건드려서, 숨겨져 있어야 할 버튼이 전환하는 순간
   // 잠깐 화면에 나타났다 사라지는 것처럼 보였음(우측 세로 중앙에 원이 반짝하고 사라지는 현상).
   // 그 자리에서는 튈 필요가 없으니 건너뜀.
-  const enteringComposeActive = !HAS_ONSCREEN_KEYBOARD && viewMode === 'edit';
+  // PC는 보기 화면(검색줄)·편집 화면(입력줄) 모두 이 버튼이 숨겨져 있음 - 폰에서만 튐
+  const enteringComposeActive = !HAS_ONSCREEN_KEYBOARD;
   if(!enteringComposeActive){
     addQuoteTriggerBtn.classList.remove('fab-icon-pop');
     void addQuoteTriggerBtn.offsetWidth;
@@ -3754,9 +3979,20 @@ function closePasscodeSheet(){
 // 배경(바깥)을 눌러도 이제 안 닫힘 - 비밀번호를 맞추지 않고는 이 창에서 아무 데도
 // 못 나가게 함(요청으로 명시적으로 막음). 시트 안 아무 데나 눌러도 계속 입력할 수
 // 있게 포커스만 주는 부분은 그대로 둠.
+// PC는 이제 톱니바퀴로 "열어보는" 창이라, 카드 바깥을 누르면 그냥 닫힘(보기 화면에 그대로 남음).
+// 폰은 예전 그대로 둠.
 passcodeOverlay.addEventListener('click', (e) => {
+  if(!HAS_ONSCREEN_KEYBOARD && !e.target.closest('.passcode-sheet')){
+    cancelPasscodeSheet();
+    return;
+  }
   if(e.target !== passcodeOverlay) passcodeInput.focus(); // 시트 안 아무 데나 눌러도 계속 입력할 수 있게
 });
+function cancelPasscodeSheet(){
+  if(!passcodeOverlay.classList.contains('open') || passcodeOverlay.classList.contains('unlocked')) return;
+  closePasscodeSheet();
+  if(viewMode === 'view' && !HAS_ONSCREEN_KEYBOARD) focusSoon(() => searchBarInput);
+}
 
 passcodeInput.addEventListener('input', () => {
   passcodeValue = passcodeInput.value.replace(/\D/g, '').slice(0, EDIT_PASSCODE.length);
@@ -4363,11 +4599,19 @@ logoMenuImportBtn.addEventListener('click', () => {
 // 워드마크(브랜드)와 톱니바퀴(설정)의 역할을 완전히 나눔 - 예전엔 로고 하나가 두 가지를
 // 다 했는데(보기모드에선 모드전환, 편집모드에선 메뉴열기), 이제 워드마크는 "보기모드에서
 // 편집모드로 들어가는 빠른 길" 하나만 맡고, 설정은 늘 톱니바퀴 하나로만 열림.
+// PC에서는 편집으로 들어가는 길이 이제 톱니바퀴 하나뿐 - 로고는 검색 중일 때 "처음으로"
+// 돌아가는 역할만 함. 폰은 예전 그대로(로고를 누르면 메모 쓰기로).
+if(SKIP_SPLASH) wordmark.title = '처음으로'; // PC(마우스 기기)에서만 - 이 시점엔 HAS_ONSCREEN_KEYBOARD가 아직 정의 전이라 같은 판정인 SKIP_SPLASH를 씀
 wordmark.addEventListener('click', () => {
+  if(!HAS_ONSCREEN_KEYBOARD){
+    if(viewMode === 'view' && searchState.mode !== 'idle') exitSearch(true);
+    return;
+  }
   if(viewMode === 'view') toggleViewMode();
-  // 편집 모드에서는 이미 편집 중이라 이 버튼이 따로 할 일이 없음(설정은 톱니바퀴가 담당)
 });
 settingsGearBtn.addEventListener('click', () => {
+  // 보기 화면에서는 비밀번호를 치고 편집 화면으로, 편집 화면에서는 설정 메뉴를 엶
+  if(viewMode === 'view'){ openPasscodeSheet(); return; }
   // 다시 누르면 닫히는 토글 - 이미 열려 있는데 또 열려고 하면 오히려 어색하니
   if(logoMenuPopover.classList.contains('open')) closeLogoMenu();
   else openLogoMenu();
@@ -4626,6 +4870,8 @@ function playRemoveAnimation(el){
 function renderArchive(){
   applyCategoryColor();
   renderCategoryTabs();
+  // 검색 결과를 보여주는 중이면(폴링으로 다른 기기 변경을 받는 등) 그 결과를 유지한 채 다시 그림
+  if(typeof isSearchShowing === 'function' && isSearchShowing()){ renderSearchView(false); return; }
 
   const fullList = sentences.filter(s => s.category === currentCategory);
 
@@ -4659,27 +4905,37 @@ function renderArchive(){
     : [...newOnes, ...rest, ...editedOnes];
 
   archiveList.innerHTML = finalList.map(s => {
-    const metaParts = [];
-    if(s.source) metaParts.push(escapeHtml(s.source));
-    if(s.ref) metaParts.push(escapeHtml(s.ref));
-    const metaLine = metaParts.join(' · ');
-    const bookmarkHtml = s.important ? `<span class="quote-bookmark" title="즐겨찾기">${BOOKMARK_SVG}</span>` : '';
-    const newBadgeHtml = isRecentlyAdded(s.ts) ? `<span class="quote-new-badge">NEW</span>` : '';
-    const editBadgeHtml = isRecentlyEdited(s) ? `<span class="quote-edit-badge">EDIT</span>` : '';
-    const showMetaRow = metaLine || s.important || newBadgeHtml || editBadgeHtml;
     const isSpotlight = spotlight && s.id === spotlight.id;
-    const spotlightLabelHtml = isSpotlight ? `<div class="spotlight-label">${escapeHtml(currentSpotlightMessage)}</div>` : '';
-    return `
-      <div class="quote-block${isSpotlight ? ' spotlight-card' : ''}" data-id="${s.id}">
+    return quoteBlockMarkup(s, { spotlightLabel: isSpotlight ? currentSpotlightMessage : '' });
+  }).join('');
+
+  setupSeenTracking();
+}
+
+// 문장 한 개의 모양 - 평소 목록과 검색 결과가 같은 함수를 써서 생김새가 늘 똑같음.
+// 검색 결과는 여러 카테고리가 섞이므로, 문장마다 자기 카테고리 색을 따로 씀(style).
+function quoteBlockMarkup(s, opts){
+  opts = opts || {};
+  const metaParts = [];
+  if(s.source) metaParts.push(escapeHtml(s.source));
+  if(s.ref) metaParts.push(escapeHtml(s.ref));
+  const metaLine = metaParts.join(' · ');
+  const bookmarkHtml = s.important ? `<span class="quote-bookmark" title="즐겨찾기">${BOOKMARK_SVG}</span>` : '';
+  const newBadgeHtml = isRecentlyAdded(s.ts) ? `<span class="quote-new-badge">NEW</span>` : '';
+  const editBadgeHtml = isRecentlyEdited(s) ? `<span class="quote-edit-badge">EDIT</span>` : '';
+  const showMetaRow = metaLine || s.important || newBadgeHtml || editBadgeHtml;
+  const isSpotlight = !!opts.spotlightLabel;
+  const spotlightLabelHtml = isSpotlight ? `<div class="spotlight-label">${escapeHtml(opts.spotlightLabel)}</div>` : '';
+  const cls = 'quote-block' + (isSpotlight ? ' spotlight-card' : '') + (opts.extraClass ? ' ' + opts.extraClass : '');
+  const styleAttr = opts.style ? ` style="${opts.style}"` : '';
+  return `
+      <div class="${cls}" data-id="${s.id}"${styleAttr}>
         ${spotlightLabelHtml}
         <p class="quote-text">${renderHighlightedText(s.text, s.highlights)}</p>
         ${s.comment ? `<div class="quote-comment"><span class="quote-comment-mark"></span><span class="quote-comment-text">${escapeHtml(s.comment)}</span></div>` : ''}
         ${showMetaRow ? `<div class="quote-meta-line">${bookmarkHtml}${newBadgeHtml}${editBadgeHtml}${metaLine ? `<span>${metaLine}</span>` : ''}</div>` : ''}
       </div>
     `;
-  }).join('');
-
-  setupSeenTracking();
 }
 
 // ── "봤다" 추적: 화면에 5초 이상 실제로 보였을 때만 기록 ────────
@@ -4766,6 +5022,8 @@ archiveList.addEventListener('click', async (e) => {
 // 잘못 판단해서, 오른쪽으로 넘겼는데 왼쪽에서 들어오는 것처럼 보이는 문제가 있었음.
 function switchCategoryAnimated(newCat, explicitDir){
   if(newCat === currentCategory) return;
+  // 검색 결과를 보던 중에 카테고리를 넘기면, 검색을 접고 그 카테고리 목록으로 감
+  if(typeof searchState !== 'undefined' && searchState.mode !== 'idle') resetSearchSilently(true);
   const oldIdx = categoryNames().indexOf(currentCategory);
   const newIdx = categoryNames().indexOf(newCat);
   const forward = explicitDir != null ? (explicitDir > 0) : (newIdx > oldIdx); // 배열상 오른쪽으로 이동하면 다음 화면이 오른쪽에서 들어옴
@@ -4810,7 +5068,8 @@ let smoothScrollRaf = null;
 // (입력줄에 절대 가리지 않도록 - 자세한 이유는 관련 CSS 주석 참고).
 // 그래서 지금 스크롤 대상이 window인지 .scroll-region인지를 이 함수들이 알아서 골라 씀.
 function scrollHost(){
-  return document.body.classList.contains('compose-active') ? scrollRegionEl : null;
+  const cl = document.body.classList;
+  return (cl.contains('compose-active') || cl.contains('search-active')) ? scrollRegionEl : null;
 }
 function currentScrollTop(){
   const host = scrollHost();
@@ -5049,6 +5308,8 @@ let composeSource = '';
 function updateComposeCatPill(){
   composeCatDot.style.background = getCategoryColor(currentCategory);
   composeCatLabel.textContent = currentCategory;
+  // 보기 화면 검색줄의 알약도 같은 카테고리를 따라감(검색 중엔 "전체"로 따로 표시)
+  if(typeof updateSearchCatPill === 'function') updateSearchCatPill();
 }
 // 카테고리 탭과 입력줄의 카테고리 알약이 같은 currentCategory를 보고 있으므로,
 // 어느 쪽에서 바뀌든 항상 같이 업데이트되게 렌더링 지점에서 호출함.
@@ -5122,10 +5383,14 @@ function autoGrowComposeTextarea(){
 // 마지막 줄과 살짝 겹칠 수는 있지만(배경이 없어 티도 잘 안 남), 그게 화면이 훅
 // 밀리는 것보다 훨씬 자연스러움.
 function syncComposeBarSpace(){
-  if(!document.body.classList.contains('compose-active')) return;
-  const h = Math.ceil(composeBar.getBoundingClientRect().height);
+  const cl = document.body.classList;
+  const bar = cl.contains('compose-active') ? composeBar : (cl.contains('search-active') ? searchBar : null);
+  if(!bar) return;
+  const h = Math.ceil(bar.getBoundingClientRect().height);
+  // AI 한마디 말풍선이 떠 있는 동안엔 그 높이만큼 목록이 더 위에서 멈춤 - 말풍선이 문장 글자 위에 겹쳐 앉지 않게
+  const voiceExtra = (bar === searchBar && searchVoice.classList.contains('show')) ? 50 : 0;
   // 입력줄 높이 + 화면 아래 여백(20px) + 목록과의 간격(24px)
-  document.documentElement.style.setProperty('--compose-reserve', (h + 20 + 24) + 'px');
+  document.documentElement.style.setProperty('--compose-reserve', (h + 20 + 24 + voiceExtra) + 'px');
 }
 window.addEventListener('resize', syncComposeBarSpace);
 composeTextInput.addEventListener('input', autoGrowComposeTextarea);
@@ -5396,6 +5661,505 @@ composeBar.addEventListener('focusout', () => {
     if(!composeBar.contains(document.activeElement)) composeBar.classList.remove('compose-bar-focused');
   }, 0);
 });
+
+// ════════════════════════════════════════════════════════════════
+// ── PC 보기 화면: 찾기 ─────────────────────────────────────────
+// 글자를 치면 맞는 문장이 바로 걸러지고(전체 카테고리), Enter를 누르면 AI가
+// 한마디와 함께 문장을 골라줌. 한 번 묻고 한 번 답하는 구조(대화를 기억하진 않음).
+// ════════════════════════════════════════════════════════════════
+// mode: idle(평소 목록) | typing(글자 맞는 문장) | thinking(AI 기다리는 중) | answer | nomatch | error
+var searchState = { mode: 'idle', query: '', ids: [], reply: '', nearLabel: false, reqId: 0, lastLocalKey: '' };
+
+function isSearchShowing(){
+  if(!searchState || !document.body.classList.contains('search-active')) return false;
+  const m = searchState.mode;
+  if(m === 'answer' || m === 'nomatch') return true;
+  return (m === 'typing' || m === 'error') && searchState.ids.length > 0;
+}
+function updateSearchCatPill(){
+  if(!searchCatDot) return;
+  if(searchState.mode !== 'idle'){
+    searchCatLabel.textContent = '전체';
+    searchBar.classList.add('searching');
+  } else {
+    searchCatDot.style.background = getCategoryColor(currentCategory);
+    searchCatLabel.textContent = currentCategory;
+    searchBar.classList.remove('searching');
+  }
+}
+searchCatPill.addEventListener('click', () => openCategoryPicker());
+function setSearchHint(text){
+  if(text) searchBarHint.textContent = text;
+  searchBarHint.classList.toggle('show', !!text);
+}
+function updateSearchSendState(){
+  document.body.classList.toggle('search-empty', searchBarInput.value.trim() === '');
+}
+function autoGrowSearchInput(){
+  searchBarInput.style.height = 'auto';
+  searchBarInput.style.height = searchBarInput.scrollHeight + 'px';
+  syncComposeBarSpace();
+}
+
+// AI 한마디 말풍선 - 글자가 바뀔 땐 살짝 사라졌다 나타나며 바뀜(툭 바뀌지 않게)
+let voiceSwapTimer = null;
+function showSearchVoice(text, kind, dotColor){
+  clearTimeout(voiceSwapTimer);
+  const apply = () => {
+    searchVoiceText.textContent = text;
+    searchVoice.classList.toggle('thinking', kind === 'thinking');
+    searchVoice.classList.toggle('muted', kind === 'muted');
+    searchVoiceDot.style.background = (kind === 'thinking' || kind === 'muted') ? '' : (dotColor || '');
+    searchVoice.classList.remove('swapping');
+  };
+  if(searchVoice.classList.contains('show') && searchVoiceText.textContent !== text){
+    searchVoice.classList.add('swapping');
+    voiceSwapTimer = setTimeout(apply, 170);
+  } else {
+    apply();
+  }
+  searchVoice.classList.add('show');
+  syncComposeBarSpace();
+}
+function hideSearchVoice(){
+  clearTimeout(voiceSwapTimer);
+  const wasShown = searchVoice.classList.contains('show');
+  searchVoice.classList.remove('show', 'swapping');
+  if(wasShown) syncComposeBarSpace();
+}
+
+// ── 글자로 바로 찾기(AI 없이, 이 기기 안에서) ──────────────────
+// 띄어쓰기는 무시하고 비교함("인간 관계"로 쳐도 "인간관계"를 찾게). 여러 단어면 모두 들어간 문장만.
+function searchHaystack(s){
+  return [s.text, s.source, s.comment, Array.isArray(s.tags) ? s.tags.join(' ') : '', s.tagWhen]
+    .filter(Boolean).join(' ').toLowerCase().replace(/\s+/g, '');
+}
+function localSearchIds(query){
+  const tokens = query.toLowerCase().split(/\s+/).filter(Boolean);
+  if(!tokens.length) return [];
+  const hits = [];
+  sentences.forEach(s => {
+    const hay = searchHaystack(s);
+    if(tokens.every(t => hay.includes(t))){
+      // 문장 본문에 직접 들어있으면 위로(태그로만 걸린 것보다 더 확실하니까)
+      const inText = (s.text || '').toLowerCase().replace(/\s+/g, '').includes(tokens[0]) ? 0 : 1;
+      hits.push({ id: s.id, rank: inText, ts: s.ts || 0 });
+    }
+  });
+  hits.sort((a, b) => a.rank - b.rank || b.ts - a.ts);
+  return hits.slice(0, 40).map(h => h.id);
+}
+
+// ── 결과 그리기 ──────────────────────────────────────────────
+function renderSearchView(animate){
+  const list = searchState.ids.map(id => findSentence(id)).filter(Boolean);
+  if(!list.length){
+    archiveList.classList.remove('search-waiting', 'search-leaving');
+    archiveList.innerHTML = `<div class="search-empty-note${animate ? ' search-in' : ''}">비슷한 문장도 아직 없어요</div>`;
+    return;
+  }
+  let i = 0;
+  const label = searchState.nearLabel
+    ? `<div class="search-near-label${animate ? ' search-in' : ''}">가장 가까운 문장</div>` : '';
+  archiveList.innerHTML = label + list.map(s => {
+    const style = `--category-color:${getCategoryColor(s.category)}` + (animate ? `;--i:${Math.min(i++, 10)}` : '');
+    return quoteBlockMarkup(s, { extraClass: animate ? 'search-in' : '', style });
+  }).join('');
+  archiveList.classList.remove('search-waiting', 'search-leaving');
+  if(animate) scrollHostTo(0, 'instant');
+  setupSeenTracking();
+}
+function setListWaiting(on){
+  archiveList.classList.toggle('search-waiting', !!on);
+}
+
+// 평소 목록으로 돌아옴. animate면 결과가 살짝 내려가며 사라지고, 원래 목록이 차르륵 다시 나타남
+function exitSearch(animate, keepInput){
+  searchState.reqId++;
+  const wasShowing = isSearchShowing() || archiveList.classList.contains('search-waiting');
+  searchState.mode = 'idle';
+  searchState.ids = [];
+  searchState.query = '';
+  searchState.nearLabel = false;
+  searchState.lastLocalKey = '';
+  if(!keepInput){
+    searchBarInput.value = '';
+    autoGrowSearchInput();
+  }
+  updateSearchSendState();
+  hideSearchVoice();
+  setSearchHint('');
+  updateSearchCatPill();
+  if(!wasShowing){
+    archiveList.classList.remove('search-waiting', 'search-leaving');
+    return;
+  }
+  if(!animate){
+    archiveList.classList.remove('search-waiting', 'search-leaving');
+    renderArchive();
+    return;
+  }
+  archiveList.classList.remove('search-waiting');
+  archiveList.classList.add('search-leaving');
+  setTimeout(() => {
+    if(searchState.mode !== 'idle') return; // 그 사이 다시 검색을 시작했으면 손대지 않음
+    renderArchive();
+    archiveList.classList.remove('search-leaving');
+    scrollHostTo(0, 'instant');
+    archiveList.querySelectorAll('.quote-block').forEach((el, idx) => {
+      if(idx > 10) return;
+      el.style.setProperty('--i', idx);
+      el.classList.add('search-in');
+    });
+  }, 170);
+}
+// 화면 전환(편집으로 들어가기)·카테고리 넘기기처럼 "다른 일로 넘어갈 때" 조용히 정리
+function resetSearchSilently(skipRender){
+  const wasShowing = isSearchShowing();
+  searchState.reqId++;
+  searchState.mode = 'idle';
+  searchState.ids = [];
+  searchState.query = '';
+  searchState.nearLabel = false;
+  searchState.lastLocalKey = '';
+  if(searchBarInput){
+    searchBarInput.value = '';
+    searchBarInput.style.height = 'auto';
+  }
+  updateSearchSendState();
+  hideSearchVoice();
+  setSearchHint('');
+  updateSearchCatPill();
+  archiveList.classList.remove('search-waiting', 'search-leaving');
+  if(wasShowing && !skipRender) renderArchive();
+}
+function activateSearchBar(){
+  updateSearchCatPill();
+  updateSearchSendState();
+  autoGrowSearchInput();
+  lastComposeReservePx = 0;
+  syncComposeBarSpace();
+  focusSoon(() => searchBarInput);
+}
+
+// 글자를 칠 때마다(조금 모아서) 바로 걸러 보여줌
+let localSearchTimer = null;
+function handleSearchTyping(){
+  autoGrowSearchInput();
+  updateSearchSendState();
+  const q = searchBarInput.value.trim();
+  if(!q){
+    if(searchState.mode !== 'idle') exitSearch(true);
+    return;
+  }
+  // 답을 받은 뒤 다시 고쳐 쓰기 시작하면 → 다시 "글자로 찾는 중"으로 돌아감
+  if(searchState.mode === 'answer' || searchState.mode === 'nomatch' || searchState.mode === 'error' || searchState.mode === 'thinking'){
+    searchState.reqId++;
+    hideSearchVoice();
+  }
+  searchState.mode = 'typing';
+  searchState.query = q;
+  updateSearchCatPill();
+  setSearchHint('Enter로 물어보기');
+  clearTimeout(localSearchTimer);
+  localSearchTimer = setTimeout(() => {
+    if(searchState.mode !== 'typing') return;
+    const ids = localSearchIds(q);
+    const key = ids.join(',');
+    if(ids.length){
+      searchState.nearLabel = false;
+      const changed = key !== searchState.lastLocalKey;
+      searchState.ids = ids;
+      searchState.lastLocalKey = key;
+      if(changed) renderSearchView(true);
+    } else {
+      // 질문처럼 길게 쓰는 중엔 글자로 딱 맞는 게 없음 - 목록은 그대로 두고 살짝 가라앉혀서
+      // "Enter를 누르면 찾아줄게요"라는 느낌만 줌(빈 화면으로 훅 바뀌지 않게)
+      if(searchState.ids.length){
+        searchState.ids = [];
+        searchState.lastLocalKey = '';
+        renderArchive();
+      }
+      setListWaiting(true);
+    }
+  }, 200);
+}
+searchBarInput.addEventListener('input', handleSearchTyping);
+searchBarInput.addEventListener('keydown', (e) => {
+  if(e.key === 'Enter' && !e.shiftKey){
+    e.preventDefault();
+    const q = searchBarInput.value.trim();
+    // 한글 입력 중 Enter가 (브라우저에 따라) 두 번 들어오는 경우가 있어, 같은 질문을 이미
+    // 묻는 중이면 한 번만 보냄(AI를 두 번 부르지 않게)
+    if(searchState.mode === 'thinking' && searchState.query === q) return;
+    if(q) askSearchAI(q);
+  } else if(e.key === 'Escape'){
+    e.preventDefault();
+    if(searchBarInput.value || searchState.mode !== 'idle') exitSearch(true);
+  }
+});
+searchSendBtn.addEventListener('click', () => {
+  const q = searchBarInput.value.trim();
+  if(q) askSearchAI(q);
+  else searchBarInput.focus();
+});
+searchBar.addEventListener('focusin', () => searchBar.classList.add('compose-bar-focused'));
+searchBar.addEventListener('focusout', () => {
+  setTimeout(() => {
+    if(!searchBar.contains(document.activeElement)) searchBar.classList.remove('compose-bar-focused');
+  }, 0);
+});
+// 입력줄 밖(목록을 보는 중)에서도 Esc로 검색을 접을 수 있음
+document.addEventListener('keydown', (e) => {
+  if(e.key !== 'Escape' || e.defaultPrevented || !document.body.classList.contains('search-active')) return;
+  if(document.activeElement === searchBarInput) return; // 위에서 처리
+  if(document.querySelector('.sheet-overlay.open, .modal-overlay.open, .ios-action-sheet.open, .ios-sheet-backdrop.open, .settings-dropdown.open')) return;
+  if(searchState.mode !== 'idle' || searchBarInput.value) exitSearch(true);
+});
+// Tab으로 "입력 중" ↔ "목록 보는 중" 오가기 - 편집 화면과 똑같은 손버릇이 통하게
+// (목록 보는 중엔 ←→로 카테고리, ↑↓로 문장 넘기기)
+document.addEventListener('keydown', (e) => {
+  if(e.key !== 'Tab' || !document.body.classList.contains('search-active')) return;
+  if(document.querySelector('.sheet-overlay.open, .modal-overlay.open, .ios-action-sheet.open, .ios-sheet-backdrop.open, .settings-dropdown.open')) return;
+  e.preventDefault();
+  if(document.activeElement === searchBarInput) searchBarInput.blur();
+  else searchBarInput.focus();
+});
+
+// ── AI에게 묻기 ──────────────────────────────────────────────
+function compactForIndex(str, max){
+  const t = (str || '').replace(/\s+/g, ' ').trim();
+  return t.length > max ? t.slice(0, max) + '…' : t;
+}
+function tidyReply(text, weak){
+  let t = (text || '').replace(/["“”'‘’]/g, '').replace(/\s+/g, ' ').trim();
+  t = t.replace(/[!！]+/g, '');
+  if(t.length > 34){
+    // 너무 길면 말이 끊기지 않게 끝맺음 근처에서 자름
+    t = t.slice(0, 33).replace(/[\s,·]+\S*$/, '') + '…';
+  }
+  if(!t) t = weak ? '딱 맞는 문장은 아직 없어요' : '도움이 될 만한 문장들이에요';
+  return t;
+}
+async function askSearchAI(query){
+  const reqId = ++searchState.reqId;
+  clearTimeout(localSearchTimer);
+  searchState.mode = 'thinking';
+  searchState.query = query;
+  updateSearchCatPill();
+  setSearchHint('Esc로 돌아가기');
+  setListWaiting(true);
+  showSearchVoice('찾는 중이에요', 'thinking');
+
+  const pool = sentences.filter(s => (s.text || '').trim());
+  const lines = pool.map((s, idx) => {
+    const tagged = Array.isArray(s.tags) && s.tags.length && s.tagWhen;
+    return [
+      idx + 1,
+      s.category || '',
+      tagged ? s.tags.join(', ') : '',
+      tagged ? s.tagWhen : '',
+      compactForIndex(s.text, tagged ? 45 : 140),
+      compactForIndex(s.comment, 40)
+    ].join('|');
+  }).join('\n');
+
+  const prompt = `너는 남영의 문장 수집 앱 "soooo.zip" 안에서 조용히 문장을 찾아주는 안내자야.
+남영의 말: "${query.replace(/"/g, "'")}"
+
+아래는 남영이 책에서 모아둔 문장 목록이야. 한 줄에 하나씩: 번호|카테고리|키워드|이럴 때|문장 앞부분|남영의 생각
+${lines}
+
+할 일:
+1. 남영의 말에 정말 도움이 되거나 딱 떠오를 문장만 골라, 가장 잘 맞는 순서로 최대 8개. 개수를 억지로 채우지 마.
+2. 남영의 말이 상황이나 고민이면 그 상황에 실제로 도움이 될 문장을, 단어나 주제면 그 주제의 문장을 골라.
+3. 정말 딱 맞는 문장이 없으면 match를 "weak"로 하고, 그나마 가장 가까운 문장 3개 이하만.
+4. reply는 문장들 위에 띄울 한마디야. 한국어 존댓말 한 문장, 공백 포함 26자 이내, "~에요" 또는 "~이에요"로 끝내고 느낌표와 이모지는 쓰지 마. 남영의 말을 짧게 받아서 써(예: "관계가 버거울 때 꺼내볼 영감들이에요", "칭찬이 필요할 때 읽어볼 문장들이에요"). weak면 솔직하게(예: "퇴사에 딱 맞는 문장은 아직 없어요").
+다른 설명 없이 JSON 한 줄로만 답해: {"reply":"...","match":"good","ids":[3,17]}`;
+
+  let result = null;
+  try{
+    const raw = await callClaude('search', prompt, 500, 15000);
+    const jsonText = raw.slice(raw.indexOf('{'), raw.lastIndexOf('}') + 1);
+    const parsed = JSON.parse(jsonText);
+    const weak = parsed.match === 'weak';
+    const seenIds = new Set();
+    const ids = (Array.isArray(parsed.ids) ? parsed.ids : [])
+      .map(n => pool[parseInt(n, 10) - 1])
+      .filter(s => s && !seenIds.has(s.id) && seenIds.add(s.id))
+      .map(s => s.id)
+      .slice(0, weak ? 3 : 8);
+    result = { weak: weak || ids.length === 0, ids, reply: tidyReply(parsed.reply, weak || ids.length === 0) };
+  }catch(err){
+    console.error('AI 검색 실패:', err);
+    result = null;
+  }
+
+  // 그 사이 다른 걸 다시 물었거나, 입력을 고쳤거나, 화면을 떠났으면 이 답은 버림
+  if(reqId !== searchState.reqId || viewMode !== 'view') return;
+
+  if(!result){
+    // AI가 답을 못 줬을 때 - 글자로 맞는 문장이라도 보여줌
+    const ids = localSearchIds(query);
+    searchState.mode = 'error';
+    searchState.ids = ids;
+    searchState.nearLabel = false;
+    showSearchVoice(ids.length ? '지금은 답을 못 받아서 글자로 찾았어요' : '지금은 답을 못 받아왔어요', 'muted');
+    if(ids.length) renderSearchView(true);
+    else setListWaiting(false);
+    return;
+  }
+  searchState.mode = result.weak ? 'nomatch' : 'answer';
+  searchState.ids = result.ids;
+  searchState.reply = result.reply;
+  searchState.nearLabel = result.weak && result.ids.length > 0;
+  const top = findSentence(result.ids[0]);
+  showSearchVoice(result.reply, result.weak ? 'muted' : 'normal', top ? getCategoryColor(top.category) : '');
+  renderSearchView(true);
+}
+
+// ── Claude 호출(Worker의 /classify를 그대로 씀 - Worker 수정 불필요) ─────
+// 모델 이름이 바뀌거나 없어졌을 때를 대비해, 안 되면 다음 후보로 넘어감.
+// 한 번 통한 모델은 기억해두고 다음부터 그걸 먼저 씀.
+const AI_MODEL_CANDIDATES = {
+  search: ['claude-haiku-5-5', 'claude-haiku-4-5', 'claude-sonnet-4-6'],
+  tag: ['claude-sonnet-5-5', 'claude-sonnet-4-6']
+};
+function rememberedModel(purpose){
+  try{ return localStorage.getItem('soooo-ai-model-' + purpose) || ''; }catch(e){ return ''; }
+}
+async function callClaude(purpose, prompt, maxTokens, timeoutMs){
+  const remembered = rememberedModel(purpose);
+  const candidates = AI_MODEL_CANDIDATES[purpose].slice();
+  if(remembered && candidates.includes(remembered)){
+    candidates.splice(candidates.indexOf(remembered), 1);
+    candidates.unshift(remembered);
+  }
+  let lastErr = null;
+  for(const model of candidates){
+    const ctrl = new AbortController();
+    const timer = setTimeout(() => ctrl.abort(), timeoutMs || 30000);
+    try{
+      const res = await fetch(WORKER_URL + '/classify', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ model, max_tokens: maxTokens, messages: [{ role: 'user', content: prompt }] }),
+        signal: ctrl.signal
+      });
+      clearTimeout(timer);
+      if(!res.ok){
+        const bodyText = await res.text().catch(() => '');
+        // 모델 이름 문제(없거나 사라짐)면 다음 후보로, 그 외 오류는 그대로 실패 처리
+        if(res.status === 404 || (res.status === 400 && /model/i.test(bodyText))){
+          lastErr = new Error('모델 사용 불가: ' + model);
+          continue;
+        }
+        throw new Error('요청 실패: ' + res.status);
+      }
+      const data = await res.json();
+      const text = (data.content || []).map(b => b.text || '').join('');
+      try{ localStorage.setItem('soooo-ai-model-' + purpose, model); }catch(e){}
+      return text;
+    }catch(err){
+      clearTimeout(timer);
+      if(err && err.message && err.message.startsWith('모델 사용 불가')){ lastErr = err; continue; }
+      throw err;
+    }
+  }
+  throw lastErr || new Error('사용할 수 있는 모델이 없음');
+}
+
+// ── 문장마다 검색용 꼬리표(태그) 붙이기 ──────────────────────────
+// 화면에는 안 보이고 찾기에만 쓰임. 키워드 몇 개 + "이럴 때 꺼내볼 문장" 한 줄.
+// 문장이나 코멘트가 바뀌면 지문(tagSig)이 달라져서 자동으로 다시 붙임.
+// PC에서만 돌림(폰은 메모용이라 굳이 여기서 AI를 부를 필요가 없음).
+const TAG_BATCH_SIZE = 10;
+function tagSourceSig(s){
+  return hashString((s.text || '') + '\u0001' + (s.comment || ''));
+}
+const tagAttemptCount = new Map(); // 이번 세션에서 몇 번 시도했는지 - 계속 실패하는 문장에 매달리지 않게
+function needsTagging(s){
+  if(!(s.text || '').trim()) return false;
+  if(s.tagSig === tagSourceSig(s)) return false;
+  return (tagAttemptCount.get(s.id) || 0) < 2;
+}
+let tagQueueTimer = null;
+let tagQueueRunning = false;
+let tagFailStreak = 0;
+function scheduleTagQueue(delay){
+  if(HAS_ONSCREEN_KEYBOARD || IS_CLAUDE_ARTIFACT) return;
+  clearTimeout(tagQueueTimer);
+  tagQueueTimer = setTimeout(runTagQueue, delay == null ? 4000 : delay);
+}
+async function requestTagsForBatch(batch){
+  const payload = batch.map((s, i) => {
+    const item = { n: i + 1, category: s.category, text: (s.text || '').replace(/\s+/g, ' ').trim() };
+    if((s.comment || '').trim()) item.comment = s.comment.replace(/\s+/g, ' ').trim();
+    return item;
+  });
+  const prompt = `아래는 남영이 책에서 모은 문장들이야. 나중에 남영이 "인간관계가 힘들 때", "조급할 때"처럼 자기 상황을 말하거나 "칭찬"처럼 주제를 말하며 찾을 때 이 문장이 떠오르도록, 문장마다 검색용 꼬리표를 붙여줘.
+- 키워드 3~5개: 주제·감정·상황을 섞어서 짧은 명사구로 (예: 경청, 조급함, 칭찬하는 법, 거절)
+- 이럴 때: 이 문장을 꺼내 보면 좋을 상황을 남영의 입장에서 한 줄로, 25자 안팎 (예: 친구들이 앞서가는 것 같아 조급할 때)
+- comment는 남영이 남긴 생각이야. 있으면 그 관점도 반영해
+- 문장 표면의 단어만 따라 하지 말고, 이 문장이 실제로 도움이 될 상황을 떠올려
+
+문장 목록(JSON):
+${JSON.stringify(payload)}
+
+한 줄에 하나씩, 정확히 아래 형식으로만 출력해. 설명이나 마크다운 없이:
+번호|||키워드1, 키워드2, 키워드3|||이럴 때 한 줄`;
+  const raw = await callClaude('tag', prompt, 1600, 60000);
+  const out = new Map();
+  raw.split('\n').forEach(line => {
+    const parts = line.split('|||').map(x => x.trim());
+    if(parts.length < 3) return;
+    const n = parseInt(parts[0].replace(/[^\d]/g, ''), 10);
+    if(!n || n > batch.length) return;
+    const tags = parts[1].split(/[,，、]/).map(t => t.replace(/^#/, '').trim()).filter(Boolean).slice(0, 5).map(t => t.slice(0, 20));
+    const when = parts[2].replace(/^["“]|["”]$/g, '').trim().slice(0, 60);
+    if(tags.length && when) out.set(n, { tags, when });
+  });
+  return out;
+}
+async function runTagQueue(){
+  if(tagQueueRunning || HAS_ONSCREEN_KEYBOARD) return;
+  tagQueueRunning = true;
+  try{
+    while(true){
+      const pending = sentences.filter(needsTagging);
+      if(!pending.length) break;
+      const batch = pending.slice(0, TAG_BATCH_SIZE);
+      const sigs = batch.map(tagSourceSig);
+      batch.forEach(s => tagAttemptCount.set(s.id, (tagAttemptCount.get(s.id) || 0) + 1));
+      let result;
+      try{
+        result = await requestTagsForBatch(batch);
+      }catch(err){
+        console.error('태그 만들기 실패 - 나중에 다시 시도:', err);
+        batch.forEach(s => tagAttemptCount.set(s.id, Math.max(0, (tagAttemptCount.get(s.id) || 1) - 1)));
+        tagFailStreak++;
+        if(tagFailStreak <= 3) scheduleTagQueue([30000, 120000, 600000][tagFailStreak - 1]);
+        break;
+      }
+      tagFailStreak = 0;
+      let applied = 0;
+      batch.forEach((orig, i) => {
+        const r = result.get(i + 1);
+        if(!r) return;
+        const s = findSentence(orig.id); // 그 사이 지워졌거나 고쳐졌으면 건너뜀
+        if(!s || tagSourceSig(s) !== sigs[i]) return;
+        s.tags = r.tags;
+        s.tagWhen = r.when;
+        s.tagSig = sigs[i];
+        s.tagsAt = Date.now();
+        applied++;
+      });
+      if(applied) await saveAll();
+    }
+  } finally {
+    tagQueueRunning = false;
+  }
+}
 
 
 // 모드+입력값 → 저장용 문자열 ("51p" 또는 "2026.04.25")
@@ -5683,10 +6447,11 @@ commentInput.addEventListener('keydown', (e) => {
 });
 
 // ── ESC 키로 열려있는 Dialog 닫기 (PC) ──────────
-// 비밀번호 창은 여기서 뺌: PC는 켜자마자 이 창이 자동으로 뜨는데, ESC로 무심코
-// 닫히면(=보기 모드로 빠짐) 편집하러 왔다가 원치 않게 튕겨나가는 셈이라 일부러 막아둠.
+// 비밀번호 창도 이제 ESC로 닫힘 - 예전엔 켜자마자 자동으로 뜨는 창이라 막아뒀는데,
+// 이제는 톱니바퀴로 직접 여는 창이라 그냥 닫혀서 보기 화면에 남는 게 자연스러움.
 document.addEventListener('keydown', (e) => {
   if(e.key !== 'Escape') return;
+  if(passcodeOverlay.classList.contains('open')){ e.preventDefault(); cancelPasscodeSheet(); return; }
   if(entryActionPopover.classList.contains('open')){ closeEntryAction(); return; }
   if(logoMenuPopover.classList.contains('open')){ closeLogoMenu(); return; }
   const dialogs = [
@@ -5715,7 +6480,10 @@ document.addEventListener('keydown', (e) => {
   if(anyOverlayOpen) return;
   // 모드에 따라 엔터가 하는 일이 달라짐: 보기 모드는 검색, 편집 모드(컴퓨터)는 늘 떠 있는
   // 입력줄에 커서를 놓아줌 (예전엔 여기서 팝업을 열었지만, 이제 그 팝업 자체가 없어짐)
-  if(viewMode === 'view') openSearchSheet();
+  if(viewMode === 'view'){
+    if(HAS_ONSCREEN_KEYBOARD) openSearchSheet();
+    else searchBarInput.focus(); // PC는 늘 떠 있는 검색줄로 커서를 옮겨줌
+  }
   else if(!HAS_ONSCREEN_KEYBOARD) composeTextInput.focus();
 });
 
