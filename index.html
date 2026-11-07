@@ -1169,6 +1169,22 @@
        자식에서 다시 불투명하게 되돌릴 수 없어서, 아예 그 영향 밖에 둔 것). */
   }
   body.compose-active .compose-bar{ display: block; }
+  /* 입력줄 "아래" 바닥은 그냥 하얗게 - 문장이 입력줄 위로 지나가는 건 좋지만, 입력줄 밑
+     틈으로 글자가 비치면 거슬림. 입력줄 아래쪽 둥근 모서리 뒤까지 살짝 덮어서 모서리
+     옆으로도 글자가 안 보이게 함(입력줄보다 아래 층이라 입력줄을 가리진 않음) */
+  body.compose-active::after,
+  body.search-active::after{
+    content: '';
+    position: fixed;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    height: calc(max(20px, env(safe-area-inset-bottom)) + 20px);
+    background: var(--bg);
+    z-index: 63;
+    pointer-events: none;
+  }
+  @media (pointer: coarse){ body.compose-active::after, body.search-active::after{ display: none; } }
   .compose-bar-inner{
     position: relative; /* 메모줄·수정줄이 "이 판" 기준으로 위에 뜨도록(우연이 아니라 명시적으로) */
     background: var(--surface);
@@ -5767,7 +5783,7 @@ function renderSearchView(animate){
     // 아무것도 안 걸렸을 때 - 흐린 목록을 남겨두면 오류처럼 보여서, 가운데에 짧은 안내만 띄움
     const note = searchState.mode === 'typing'
       ? `<div class="search-empty-title">이 단어가 들어간 문장은 없어요</div><div class="search-empty-sub">Enter를 누르면 비슷한 뜻의 문장을 찾아볼게요</div>`
-      : `<div class="search-empty-title">비슷한 문장도 아직 없어요</div>`;
+      : `<div class="search-empty-title">이 질문을 해결해 줄 좋은 문장이 아직 없어요</div><div class="search-empty-sub">언젠가 책에서 만나게 될 문장이에요</div>`;
     archiveList.innerHTML = `<div class="search-empty-note${animate ? ' search-in' : ''}">${note}</div>`;
     return;
   }
@@ -5944,7 +5960,7 @@ function tidyReply(text, weak){
     // 너무 길면 말이 끊기지 않게 끝맺음 근처에서 자름
     t = t.slice(0, 33).replace(/[\s,·]+\S*$/, '') + '…';
   }
-  if(!t) t = weak ? '딱 맞는 문장은 아직 없어요' : '도움이 될 만한 문장들이에요';
+  if(!t) t = weak ? '여기에 맞는 영감은 아직 없어요' : '도움이 될 만한 문장들이에요';
   return t;
 }
 async function askSearchAI(query){
@@ -5992,11 +6008,11 @@ async function askSearchAI(query){
 ${lines}
 
 할 일:
-1. 남영의 말에 정말 도움이 되거나 딱 떠오를 문장만 골라, 가장 잘 맞는 순서로 최대 8개. 개수를 억지로 채우지 마.
-2. 남영의 말이 상황이나 고민이면 그 상황에 실제로 도움이 될 문장을, 단어나 주제면 그 주제의 문장을 골라.
-3. 정말 딱 맞는 문장이 없으면 맞음을 weak로 하고, 그나마 가장 가까운 문장 3개 이하만.
-5. 띄어쓰기·맞춤법이나 "진짜, 너무, 정말" 같은 강조하는 말만 다른 질문은 같은 질문으로 보고, 늘 같은 문장을 같은 순서로 골라. 순서는 질문에 직접 도움이 되는 정도가 높은 순이고, 비슷하면 번호가 작은 순.
-4. reply는 문장들 위에 띄울 한마디야. 한국어 존댓말 한 문장, 공백 포함 26자 이내, "~에요" 또는 "~이에요"로 끝내고 느낌표와 이모지는 쓰지 마. 남영의 말을 짧게 받아서 써(예: "관계가 버거울 때 꺼내볼 영감들이에요", "칭찬이 필요할 때 읽어볼 문장들이에요"). weak면 솔직하게(예: "퇴사에 딱 맞는 문장은 아직 없어요").
+1. 남영의 말에 실제로 도움이 되거나 딱 떠오를 문장만 골라, 가장 잘 맞는 순서로 최대 8개. 개수를 억지로 채우지 마.
+2. 남영의 말이 상황이나 고민이면 그 상황에 실제로 도움이 될 문장을, 단어나 주제면 그 주제의 문장을 골라. 단어가 직접 안 겹쳐도 자연스럽게 연상되어 도움이 되는 문장은 괜찮아.
+3. 하지만 억지로 끼워 맞춘 연결(같은 단어가 스치듯 나오기만 하거나, 한참 돌려 생각해야 이어지는 것)은 빼. 그런 것밖에 없으면 하나도 고르지 말고 맞음을 none으로, 번호는 비워둬. 엉뚱한 문장을 보여주느니 "아직 없다"고 하는 게 남영에게 더 좋아.
+4. 띄어쓰기·맞춤법이나 "진짜, 너무, 정말" 같은 강조하는 말만 다른 질문은 같은 질문으로 보고, 늘 같은 문장을 같은 순서로 골라. 순서는 질문에 직접 도움이 되는 정도가 높은 순이고, 비슷하면 번호가 작은 순.
+5. 한마디는 문장들 위에 띄울 말이야. 한국어 존댓말 한 문장, 공백 포함 26자 이내, "~에요" 또는 "~이에요"로 끝내고 느낌표와 이모지는 쓰지 마. 남영의 말을 짧게 받아서 써(예: "관계가 버거울 때 꺼내볼 영감들이에요", "칭찬이 필요할 때 읽어볼 문장들이에요"). none이면 주제를 짧게 받아 솔직하게(예: "행복에 대한 영감은 아직 없어요", "퇴사에 대한 영감은 아직 없어요").
 다른 설명 없이 딱 아래 세 줄로만 답해(따옴표·마크다운 없이):
 한마디: 관계가 버거울 때 꺼내볼 영감들이에요
 맞음: good
@@ -6015,11 +6031,12 @@ ${lines}
     }
     const weak = parsed.weak;
     const seenIds = new Set();
-    const ids = parsed.nums
+    // "딱 맞는 게 없다"고 하면 억지로 가까운 문장을 보여주지 않음(엉뚱한 문장보다 "아직 없어요"가 나음)
+    const ids = weak ? [] : parsed.nums
       .map(n => pool[n - 1])
       .filter(s => s && !seenIds.has(s.id) && seenIds.add(s.id))
       .map(s => s.id)
-      .slice(0, weak ? 3 : 8);
+      .slice(0, 8);
     result = { weak: weak || ids.length === 0, ids, reply: tidyReply(parsed.reply, weak || ids.length === 0) };
   }catch(err){
     console.error('AI 검색 실패:', err);
@@ -6051,6 +6068,7 @@ ${lines}
   applySearchResult(result);
 }
 function applySearchResult(result){
+  if(result.weak) result = Object.assign({}, result, { ids: [] }); // 예전에 기억해둔 "가까운 문장"도 이제는 안 띄움
   searchState.lastLocalKey = '';
   searchState.mode = result.weak ? 'nomatch' : 'answer';
   searchState.ids = result.ids;
@@ -6107,7 +6125,7 @@ function parseSearchAnswer(raw){
   reply = lineOf('한마디') || lineOf('reply');
   const matchLine = lineOf('맞음') || lineOf('match');
   const numLine = lineOf('번호') || lineOf('ids');
-  if(matchLine) weak = /weak|약|없/i.test(matchLine);
+  if(matchLine) weak = /none|weak|약|없/i.test(matchLine);
   if(numLine) nums = (numLine.match(/\d+/g) || []).map(Number);
   // 2) JSON처럼 왔을 때
   if(!reply || !numLine){
@@ -6116,7 +6134,7 @@ function parseSearchAnswer(raw){
     const mt = text.match(/"match"\s*:\s*"([^"]*)"/);
     if(r && !reply) reply = r[1];
     if(ids && !numLine) nums = (ids[1].match(/\d+/g) || []).map(Number);
-    if(mt && !matchLine) weak = /weak/i.test(mt[1]);
+    if(mt && !matchLine) weak = /none|weak/i.test(mt[1]);
   }
   if(!reply && !nums.length) return null;
   return { reply, weak, nums };
