@@ -1182,10 +1182,13 @@
        지금 화살표가 문장 훑어보기에 쓰이는 중이라는 걸 은은하게 알려줌 */
     transition: opacity 0.22s ease, transform 0.22s ease;
   }
+  /* 판 자체는 불투명하게 두고 안의 내용만 흐리게 - 이제 입력줄 뒤로 문장이 지나가므로
+     판까지 반투명해지면 뒤 글자가 비쳐 보여 지저분해짐 */
   .compose-bar:not(.compose-bar-focused) .compose-bar-inner{
-    opacity: 0.68;
     transform: scale(0.975);
   }
+  .compose-bar-inner > *{ transition: opacity 0.22s ease; }
+  .compose-bar:not(.compose-bar-focused) .compose-bar-inner > *{ opacity: 0.68; }
   /* 채팅줄이 떠 있는 동안엔 카테고리 탭이 중복이라 감춤 - 채팅줄 안 카테고리 알약이 그 역할을 대신함 */
   body.compose-active .category-tabs{ display: none; }
   /* 목록이 페이지 전체(window)가 아니라 이 안에서만 스크롤되게 함.
@@ -1201,8 +1204,12 @@
   /* 실제 스크롤은 이 판(화면 전체 폭)이 담당함 - 안쪽 .wrap은 700px로 좁게 배치만 될 뿐이라,
      예전엔 그 좁은 폭 밖(양옆 여백)에 마우스가 있으면 휠을 굴려도 반응이 없었음.
      이 판을 화면 전체 폭으로 넓혀서, 어디에 마우스가 있든 휠이 먹히게 함. */
+  /* 목록은 화면 끝까지 이어지고, 입력줄이 그 위에 떠 있음(입력줄 위아래로 문장이 계속 보임 -
+     예전엔 입력줄 위에서 목록을 딱 잘라 흰 여백이 생겨서 너무 많이 잘려 보였음).
+     맨 아래 문장도 입력줄 위까지 올라올 수 있게 .wrap 아래쪽에 입력줄 높이만큼 여유를 둠. */
   body.compose-active .scroll-region{
-    height: calc(100vh - var(--compose-reserve, 160px));
+    height: 100vh;
+    scroll-padding-bottom: var(--compose-reserve, 160px);
     overflow-y: auto;
     overscroll-behavior: contain;
     /* 스크롤은 마우스 휠·화살표 키로 그대로 되지만, 막대는 안 보이게 함 - 클로드 채팅창처럼
@@ -1433,8 +1440,11 @@
   body:not(.search-active) .search-bar{ display: none !important; }
   body.search-active .category-tabs{ display: none; }
   body.search-active{ overflow: hidden; }
+  body.compose-active .scroll-region > .wrap,
+  body.search-active .scroll-region > .wrap{ padding-bottom: calc(var(--compose-reserve, 160px) + 12px); }
   body.search-active .scroll-region{
-    height: calc(100vh - var(--compose-reserve, 160px));
+    height: 100vh;
+    scroll-padding-bottom: var(--compose-reserve, 160px);
     overflow-y: auto;
     overscroll-behavior: contain;
     scrollbar-width: none;
@@ -1520,11 +1530,11 @@
   }
   .search-near-label.search-in{ animation: searchIn 0.45s ease both; }
   .search-empty-note{
-    padding: 60px 0;
+    padding: 22vh 0 0;
     text-align: center;
-    font-size: 13px;
-    color: var(--text-tertiary);
   }
+  .search-empty-title{ font-size: 14px; font-weight: 700; color: var(--text-secondary); }
+  .search-empty-sub{ margin-top: 6px; font-size: 12.5px; color: var(--text-tertiary); }
   @media (prefers-reduced-motion: reduce){
     .quote-block.search-in, .search-near-label.search-in{ animation: none; }
     .archive-list, .search-voice{ transition: none; }
@@ -5082,7 +5092,10 @@ function currentScrollMaxY(){
 }
 function currentViewportHeight(){
   const host = scrollHost();
-  return host ? host.clientHeight : window.innerHeight;
+  if(!host) return window.innerHeight;
+  // 목록이 입력줄 뒤까지 이어지므로, "실제로 보이는 높이"는 입력줄 자리를 뺀 만큼
+  const reserve = parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--compose-reserve')) || 0;
+  return Math.max(200, host.clientHeight - reserve);
 }
 function scrollHostTo(y, behavior){
   const host = scrollHost();
@@ -5387,10 +5400,8 @@ function syncComposeBarSpace(){
   const bar = cl.contains('compose-active') ? composeBar : (cl.contains('search-active') ? searchBar : null);
   if(!bar) return;
   const h = Math.ceil(bar.getBoundingClientRect().height);
-  // AI 한마디 말풍선이 떠 있는 동안엔 그 높이만큼 목록이 더 위에서 멈춤 - 말풍선이 문장 글자 위에 겹쳐 앉지 않게
-  const voiceExtra = (bar === searchBar && searchVoice.classList.contains('show')) ? 50 : 0;
   // 입력줄 높이 + 화면 아래 여백(20px) + 목록과의 간격(24px)
-  document.documentElement.style.setProperty('--compose-reserve', (h + 20 + 24 + voiceExtra) + 'px');
+  document.documentElement.style.setProperty('--compose-reserve', (h + 20 + 24) + 'px');
 }
 window.addEventListener('resize', syncComposeBarSpace);
 composeTextInput.addEventListener('input', autoGrowComposeTextarea);
@@ -5674,7 +5685,8 @@ function isSearchShowing(){
   if(!searchState || !document.body.classList.contains('search-active')) return false;
   const m = searchState.mode;
   if(m === 'answer' || m === 'nomatch') return true;
-  return (m === 'typing' || m === 'error') && searchState.ids.length > 0;
+  if(m === 'typing') return !!searchState.typingShown; // 글자로 찾은 결과(또는 "없어요" 안내)를 띄운 뒤
+  return m === 'error' && searchState.ids.length > 0;
 }
 function updateSearchCatPill(){
   if(!searchCatDot) return;
@@ -5719,13 +5731,10 @@ function showSearchVoice(text, kind, dotColor){
     apply();
   }
   searchVoice.classList.add('show');
-  syncComposeBarSpace();
 }
 function hideSearchVoice(){
   clearTimeout(voiceSwapTimer);
-  const wasShown = searchVoice.classList.contains('show');
   searchVoice.classList.remove('show', 'swapping');
-  if(wasShown) syncComposeBarSpace();
 }
 
 // ── 글자로 바로 찾기(AI 없이, 이 기기 안에서) ──────────────────
@@ -5755,7 +5764,11 @@ function renderSearchView(animate){
   const list = searchState.ids.map(id => findSentence(id)).filter(Boolean);
   if(!list.length){
     archiveList.classList.remove('search-waiting', 'search-leaving');
-    archiveList.innerHTML = `<div class="search-empty-note${animate ? ' search-in' : ''}">비슷한 문장도 아직 없어요</div>`;
+    // 아무것도 안 걸렸을 때 - 흐린 목록을 남겨두면 오류처럼 보여서, 가운데에 짧은 안내만 띄움
+    const note = searchState.mode === 'typing'
+      ? `<div class="search-empty-title">이 단어가 들어간 문장은 없어요</div><div class="search-empty-sub">Enter를 누르면 비슷한 뜻의 문장을 찾아볼게요</div>`
+      : `<div class="search-empty-title">비슷한 문장도 아직 없어요</div>`;
+    archiveList.innerHTML = `<div class="search-empty-note${animate ? ' search-in' : ''}">${note}</div>`;
     return;
   }
   let i = 0;
@@ -5782,6 +5795,7 @@ function exitSearch(animate, keepInput){
   searchState.query = '';
   searchState.nearLabel = false;
   searchState.lastLocalKey = '';
+  searchState.typingShown = false;
   if(!keepInput){
     searchBarInput.value = '';
     autoGrowSearchInput();
@@ -5822,6 +5836,7 @@ function resetSearchSilently(skipRender){
   searchState.query = '';
   searchState.nearLabel = false;
   searchState.lastLocalKey = '';
+  searchState.typingShown = false;
   if(searchBarInput){
     searchBarInput.value = '';
     searchBarInput.style.height = 'auto';
@@ -5865,23 +5880,14 @@ function handleSearchTyping(){
   localSearchTimer = setTimeout(() => {
     if(searchState.mode !== 'typing') return;
     const ids = localSearchIds(q);
-    const key = ids.join(',');
-    if(ids.length){
-      searchState.nearLabel = false;
-      const changed = key !== searchState.lastLocalKey;
-      searchState.ids = ids;
-      searchState.lastLocalKey = key;
-      if(changed) renderSearchView(true);
-    } else {
-      // 질문처럼 길게 쓰는 중엔 글자로 딱 맞는 게 없음 - 목록은 그대로 두고 살짝 가라앉혀서
-      // "Enter를 누르면 찾아줄게요"라는 느낌만 줌(빈 화면으로 훅 바뀌지 않게)
-      if(searchState.ids.length){
-        searchState.ids = [];
-        searchState.lastLocalKey = '';
-        renderArchive();
-      }
-      setListWaiting(true);
-    }
+    // 글자로 맞는 게 없으면(질문처럼 길게 쓰는 중 등) 가운데에 "없어요 · Enter로 찾아볼게요" 안내
+    const key = ids.length ? ids.join(',') : '(empty)';
+    const changed = key !== searchState.lastLocalKey;
+    searchState.nearLabel = false;
+    searchState.ids = ids;
+    searchState.lastLocalKey = key;
+    searchState.typingShown = true;
+    if(changed) renderSearchView(true);
   }, 200);
 }
 searchBarInput.addEventListener('input', handleSearchTyping);
@@ -5959,7 +5965,7 @@ async function askSearchAI(query){
       s.category || '',
       tagged ? s.tags.join(', ') : '',
       tagged ? s.tagWhen : '',
-      compactForIndex(s.text, tagged ? 45 : 140),
+      compactForIndex(s.text, tagged ? 30 : 140),
       compactForIndex(s.comment, 40)
     ].join('|');
   }).join('\n');
@@ -5978,8 +5984,9 @@ ${lines}
 다른 설명 없이 JSON 한 줄로만 답해: {"reply":"...","match":"good","ids":[3,17]}`;
 
   let result = null;
+  searchInFlight = true;
   try{
-    const raw = await callClaude('search', prompt, 500, 15000);
+    const raw = await callClaude('search', prompt, 500, 25000);
     const jsonText = raw.slice(raw.indexOf('{'), raw.lastIndexOf('}') + 1);
     const parsed = JSON.parse(jsonText);
     const weak = parsed.match === 'weak';
@@ -5992,21 +5999,29 @@ ${lines}
     result = { weak: weak || ids.length === 0, ids, reply: tidyReply(parsed.reply, weak || ids.length === 0) };
   }catch(err){
     console.error('AI 검색 실패:', err);
+    if(err instanceof SyntaxError) lastAiErrorCode = '형식';
     result = null;
   }
+  searchInFlight = false;
 
   // 그 사이 다른 걸 다시 물었거나, 입력을 고쳤거나, 화면을 떠났으면 이 답은 버림
   if(reqId !== searchState.reqId || viewMode !== 'view') return;
 
+  searchState.lastLocalKey = ''; // 다음에 다시 고쳐 쓰기 시작하면 글자 결과를 새로 그리게
   if(!result){
-    // AI가 답을 못 줬을 때 - 글자로 맞는 문장이라도 보여줌
+    // AI가 답을 못 줬을 때 - 글자로 맞는 문장이라도 보여줌. 무슨 문제였는지 짧은 표시를 붙여둠
+    // (예: 429=요청이 몰림, 시간 초과 등 - 원인을 알아야 고칠 수 있어서)
     const ids = localSearchIds(query);
+    const code = lastAiErrorCode ? ` (${lastAiErrorCode})` : '';
     searchState.mode = 'error';
     searchState.ids = ids;
     searchState.nearLabel = false;
-    showSearchVoice(ids.length ? '지금은 답을 못 받아서 글자로 찾았어요' : '지금은 답을 못 받아왔어요', 'muted');
+    showSearchVoice((ids.length ? '답을 못 받아서 글자로 찾았어요' : '지금은 답을 못 받아왔어요') + code, 'muted');
     if(ids.length) renderSearchView(true);
-    else setListWaiting(false);
+    else {
+      archiveList.classList.remove('search-waiting');
+      archiveList.innerHTML = `<div class="search-empty-note search-in"><div class="search-empty-title">잠시 뒤에 다시 물어봐 주세요</div></div>`;
+    }
     return;
   }
   searchState.mode = result.weak ? 'nomatch' : 'answer';
@@ -6028,6 +6043,8 @@ const AI_MODEL_CANDIDATES = {
 function rememberedModel(purpose){
   try{ return localStorage.getItem('soooo-ai-model-' + purpose) || ''; }catch(e){ return ''; }
 }
+let lastAiErrorCode = '';   // 마지막 실패 이유(짧게) - 말풍선에 같이 띄워 원인을 알 수 있게
+let searchInFlight = false; // 검색을 묻는 중엔 태그 작업이 잠깐 비켜줌(요청이 한꺼번에 몰리지 않게)
 async function callClaude(purpose, prompt, maxTokens, timeoutMs){
   const remembered = rememberedModel(purpose);
   const candidates = AI_MODEL_CANDIDATES[purpose].slice();
@@ -6035,35 +6052,42 @@ async function callClaude(purpose, prompt, maxTokens, timeoutMs){
     candidates.splice(candidates.indexOf(remembered), 1);
     candidates.unshift(remembered);
   }
+  lastAiErrorCode = '';
   let lastErr = null;
   for(const model of candidates){
-    const ctrl = new AbortController();
-    const timer = setTimeout(() => ctrl.abort(), timeoutMs || 30000);
-    try{
-      const res = await fetch(WORKER_URL + '/classify', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ model, max_tokens: maxTokens, messages: [{ role: 'user', content: prompt }] }),
-        signal: ctrl.signal
-      });
-      clearTimeout(timer);
-      if(!res.ok){
-        const bodyText = await res.text().catch(() => '');
-        // 모델 이름 문제(없거나 사라짐)면 다음 후보로, 그 외 오류는 그대로 실패 처리
-        if(res.status === 404 || (res.status === 400 && /model/i.test(bodyText))){
-          lastErr = new Error('모델 사용 불가: ' + model);
-          continue;
-        }
-        throw new Error('요청 실패: ' + res.status);
+    // 같은 모델로 최대 2번: 요청이 몰리거나(429) 서버가 바쁠 때(5xx)는 잠깐 쉬었다 한 번 더
+    for(let attempt = 0; attempt < 2; attempt++){
+      const ctrl = new AbortController();
+      const timer = setTimeout(() => ctrl.abort(), timeoutMs || 30000);
+      let res;
+      try{
+        res = await fetch(WORKER_URL + '/classify', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ model, max_tokens: maxTokens, messages: [{ role: 'user', content: prompt }] }),
+          signal: ctrl.signal
+        });
+      }catch(err){
+        clearTimeout(timer);
+        lastAiErrorCode = (err && err.name === 'AbortError') ? '시간 초과' : '연결';
+        throw err;
       }
-      const data = await res.json();
-      const text = (data.content || []).map(b => b.text || '').join('');
-      try{ localStorage.setItem('soooo-ai-model-' + purpose, model); }catch(e){}
-      return text;
-    }catch(err){
       clearTimeout(timer);
-      if(err && err.message && err.message.startsWith('모델 사용 불가')){ lastErr = err; continue; }
-      throw err;
+      if(res.ok){
+        const data = await res.json();
+        const text = (data.content || []).map(b => b.text || '').join('');
+        try{ localStorage.setItem('soooo-ai-model-' + purpose, model); }catch(e){}
+        return text;
+      }
+      const bodyText = await res.text().catch(() => '');
+      console.warn(`AI 요청 실패 [${purpose}] ${model} → ${res.status}`, bodyText.slice(0, 300));
+      lastAiErrorCode = String(res.status);
+      lastErr = new Error('요청 실패: ' + res.status + ' ' + bodyText.slice(0, 200));
+      if((res.status === 429 || res.status >= 500) && attempt === 0){
+        await new Promise(r => setTimeout(r, res.status === 429 ? 2500 : 1200));
+        continue;
+      }
+      break; // 다음 후보 모델로(모델이 없거나 권한이 없는 경우 등도 여기서 넘어감)
     }
   }
   throw lastErr || new Error('사용할 수 있는 모델이 없음');
@@ -6128,6 +6152,7 @@ async function runTagQueue(){
     while(true){
       const pending = sentences.filter(needsTagging);
       if(!pending.length) break;
+      while(searchInFlight) await new Promise(r => setTimeout(r, 500)); // 검색이 먼저
       const batch = pending.slice(0, TAG_BATCH_SIZE);
       const sigs = batch.map(tagSourceSig);
       batch.forEach(s => tagAttemptCount.set(s.id, (tagAttemptCount.get(s.id) || 0) + 1));
