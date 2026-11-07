@@ -5938,7 +5938,7 @@ function compactForIndex(str, max){
   return t.length > max ? t.slice(0, max) + '…' : t;
 }
 function tidyReply(text, weak){
-  let t = (text || '').replace(/["“”'‘’]/g, '').replace(/\s+/g, ' ').trim();
+  let t = (text || '').replace(/["“”'‘’*_`]/g, '').replace(/\s+/g, ' ').trim();
   t = t.replace(/[!！]+/g, '');
   if(t.length > 34){
     // 너무 길면 말이 끊기지 않게 끝맺음 근처에서 자름
@@ -5981,25 +5981,31 @@ ${lines}
 2. 남영의 말이 상황이나 고민이면 그 상황에 실제로 도움이 될 문장을, 단어나 주제면 그 주제의 문장을 골라.
 3. 정말 딱 맞는 문장이 없으면 match를 "weak"로 하고, 그나마 가장 가까운 문장 3개 이하만.
 4. reply는 문장들 위에 띄울 한마디야. 한국어 존댓말 한 문장, 공백 포함 26자 이내, "~에요" 또는 "~이에요"로 끝내고 느낌표와 이모지는 쓰지 마. 남영의 말을 짧게 받아서 써(예: "관계가 버거울 때 꺼내볼 영감들이에요", "칭찬이 필요할 때 읽어볼 문장들이에요"). weak면 솔직하게(예: "퇴사에 딱 맞는 문장은 아직 없어요").
-다른 설명 없이 JSON 한 줄로만 답해: {"reply":"...","match":"good","ids":[3,17]}`;
+다른 설명 없이 딱 아래 세 줄로만 답해(따옴표·마크다운 없이):
+한마디: 관계가 버거울 때 꺼내볼 영감들이에요
+맞음: good
+번호: 3, 17, 5`;
 
   let result = null;
   searchInFlight = true;
   try{
-    const raw = await callClaude('search', prompt, 500, 25000);
-    const jsonText = raw.slice(raw.indexOf('{'), raw.lastIndexOf('}') + 1);
-    const parsed = JSON.parse(jsonText);
-    const weak = parsed.match === 'weak';
+    const raw = await callClaude('search', prompt, 1500, 30000);
+    const parsed = parseSearchAnswer(raw);
+    if(!parsed){
+      console.warn('AI 답을 못 읽음 - 원문:', raw);
+      lastAiErrorCode = raw.trim() ? '형식' : '빈 응답';
+      throw new Error('답 형식을 못 읽음');
+    }
+    const weak = parsed.weak;
     const seenIds = new Set();
-    const ids = (Array.isArray(parsed.ids) ? parsed.ids : [])
-      .map(n => pool[parseInt(n, 10) - 1])
+    const ids = parsed.nums
+      .map(n => pool[n - 1])
       .filter(s => s && !seenIds.has(s.id) && seenIds.add(s.id))
       .map(s => s.id)
       .slice(0, weak ? 3 : 8);
     result = { weak: weak || ids.length === 0, ids, reply: tidyReply(parsed.reply, weak || ids.length === 0) };
   }catch(err){
     console.error('AI 검색 실패:', err);
-    if(err instanceof SyntaxError) lastAiErrorCode = '형식';
     result = null;
   }
   searchInFlight = false;
@@ -6031,6 +6037,35 @@ ${lines}
   const top = findSentence(result.ids[0]);
   showSearchVoice(result.reply, result.weak ? 'muted' : 'normal', top ? getCategoryColor(top.category) : '');
   renderSearchView(true);
+}
+
+// AI의 답을 최대한 너그럽게 읽음 - 약속한 세 줄 형식이 기본이지만, JSON이나 마크다운이
+// 섞여 와도 한마디·번호를 뽑아냄(모델마다 말투가 조금씩 달라서 한 가지 모양만 믿으면 깨짐)
+function parseSearchAnswer(raw){
+  const text = (raw || '').replace(/```[a-z]*\n?/gi, '').trim();
+  if(!text) return null;
+  let reply = '', weak = false, nums = [];
+  // 1) 세 줄 형식
+  const lineOf = (label) => {
+    const m = text.match(new RegExp('^[\\s*#>-]*' + label + '\\s*[:：]\\s*(.+)$', 'm'));
+    return m ? m[1].trim() : '';
+  };
+  reply = lineOf('한마디') || lineOf('reply');
+  const matchLine = lineOf('맞음') || lineOf('match');
+  const numLine = lineOf('번호') || lineOf('ids');
+  if(matchLine) weak = /weak|약|없/i.test(matchLine);
+  if(numLine) nums = (numLine.match(/\d+/g) || []).map(Number);
+  // 2) JSON처럼 왔을 때
+  if(!reply || !numLine){
+    const r = text.match(/"reply"\s*:\s*"([^"]*)"/);
+    const ids = text.match(/"ids"\s*:\s*\[([^\]]*)\]/);
+    const mt = text.match(/"match"\s*:\s*"([^"]*)"/);
+    if(r && !reply) reply = r[1];
+    if(ids && !numLine) nums = (ids[1].match(/\d+/g) || []).map(Number);
+    if(mt && !matchLine) weak = /weak/i.test(mt[1]);
+  }
+  if(!reply && !nums.length) return null;
+  return { reply, weak, nums };
 }
 
 // ── Claude 호출(Worker의 /classify를 그대로 씀 - Worker 수정 불필요) ─────
@@ -6075,7 +6110,9 @@ async function callClaude(purpose, prompt, maxTokens, timeoutMs){
       clearTimeout(timer);
       if(res.ok){
         const data = await res.json();
-        const text = (data.content || []).map(b => b.text || '').join('');
+        // 글자(text) 블록만 모음 - 생각(thinking) 같은 다른 블록은 건너뜀
+        const text = (data.content || []).filter(b => b.type === 'text' || typeof b.text === 'string').map(b => b.text || '').join('');
+        if(!text.trim()) console.warn(`AI 빈 응답 [${purpose}] ${model}`, data.stop_reason, data);
         try{ localStorage.setItem('soooo-ai-model-' + purpose, model); }catch(e){}
         return text;
       }
@@ -6132,7 +6169,7 @@ ${JSON.stringify(payload)}
 
 한 줄에 하나씩, 정확히 아래 형식으로만 출력해. 설명이나 마크다운 없이:
 번호|||키워드1, 키워드2, 키워드3|||이럴 때 한 줄`;
-  const raw = await callClaude('tag', prompt, 1600, 60000);
+  const raw = await callClaude('tag', prompt, 4000, 90000);
   const out = new Map();
   raw.split('\n').forEach(line => {
     const parts = line.split('|||').map(x => x.trim());
