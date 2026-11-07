@@ -760,6 +760,32 @@
     font-size: 13px;
     color: var(--text-tertiary);
   }
+  .search-empty-hint b{ display: block; font-size: 14px; font-weight: 700; color: var(--text-secondary); margin-bottom: 6px; text-wrap: balance; }
+  /* 폰 검색: AI 한마디 줄 */
+  .msearch-voice{
+    display: none;
+    align-items: center;
+    gap: 8px;
+    margin: 12px 2px 2px;
+    font-size: 13px;
+    font-weight: 700;
+    color: var(--text);
+    flex-shrink: 0;
+  }
+  .msearch-voice.show{ display: flex; animation: searchQuick 0.2s ease-out both; }
+  .msearch-voice.thinking{ color: var(--text-tertiary); font-weight: 600; }
+  .msearch-voice-dot{ width: 7px; height: 7px; border-radius: 50%; flex-shrink: 0; background: var(--category-color); }
+  .msearch-voice.muted .msearch-voice-dot, .msearch-voice.thinking .msearch-voice-dot{ background: var(--text-tertiary); }
+  .msearch-voice.thinking .msearch-voice-dot{ animation: searchDotPulse 1s ease-in-out infinite; }
+  .search-results-list{ transition: opacity 0.24s ease-out; }
+  .search-results-list.waiting{ opacity: 0.4; }
+  .search-result-item.search-in{
+    animation: searchIn 0.5s cubic-bezier(0.2, 0.75, 0.2, 1) both;
+    animation-delay: calc(var(--i, 0) * 45ms);
+  }
+  @media (prefers-reduced-motion: reduce){
+    .search-result-item.search-in, .msearch-voice.show, .msearch-voice.thinking .msearch-voice-dot{ animation: none; }
+  }
   /* 검색 결과를 눌러 이동했을 때, 그 문장이 잠깐 옅게 빛났다가 가라앉으며 눈에 띄게 함 */
   @keyframes searchJumpFlash{
     0%{ background: color-mix(in srgb, var(--category-color) 30%, white); }
@@ -2593,7 +2619,9 @@
       <button type="button" class="sheet-close-btn" id="searchCloseBtn" title="닫기" aria-label="닫기">
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M18 6 6 18M6 6l12 12"/></svg>
       </button>
-      <input type="text" id="searchInput" class="search-input-field" placeholder="문장이나 책 제목으로 찾아보세요" autocomplete="off">
+      <input type="text" id="searchInput" class="search-input-field" placeholder="어떤 문장이 필요해요?" autocomplete="off" enterkeyhint="search">
+      <!-- AI의 한마디(질문하고 검색을 누르면 결과 위에 뜸) - PC 검색줄 말풍선과 같은 역할 -->
+      <div class="msearch-voice" id="mSearchVoice" aria-live="polite"><span class="msearch-voice-dot" id="mSearchVoiceDot"></span><span id="mSearchVoiceText"></span></div>
       <div id="searchResultsList" class="search-results-list"></div>
     </div>
   </div>
@@ -4699,6 +4727,9 @@ settingsGearBtn.addEventListener('click', () => {
 function openSearchSheet(){
   searchInput.value = '';
   searchActiveIdx = -1;
+  mSearch.reqId++;
+  mSearch.mode = 'typing';
+  mSearchHideVoice();
   renderSearchResults('');
   searchSheetOverlay.classList.add('open');
   lockBodyScroll();
@@ -4769,35 +4800,95 @@ function matchesTyping(text, query){
   return toJamo(t).includes(toJamo(q));
 }
 
-function renderSearchResults(query){
-  const q = query.trim().toLowerCase();
-  if(!q){
-    searchResultsList.innerHTML = `<div class="search-empty-hint">문장이나 책 제목을 입력해보세요</div>`;
-    return;
-  }
-  const matches = sentences.filter(s =>
-    matchesTyping(s.text, q) || matchesTyping(s.source, q)
-  );
-  if(matches.length === 0){
-    searchResultsList.innerHTML = `<div class="search-empty-hint">찾는 문장이 없어요</div>`;
-    return;
-  }
-  searchResultsList.innerHTML = matches.map(s => {
-    const color = getCategoryColor(s.category);
-    const meta = [s.source, s.ref].filter(Boolean).map(escapeHtml).join(' · ');
-    // 목록에서 보던 그대로 - 칠해둔 형광펜과 저장(책갈피) 표시를 검색 결과에도 그대로 보여줌
-    const bookmark = s.important ? `<span class="search-result-bookmark">${BOOKMARK_SVG}</span>` : '';
-    return `<div class="search-result-item" data-id="${s.id}">
+// ── 폰 검색(돋보기) ──────────────────────────────────────────
+// 글자를 치면 맞는 문장이 바로 걸러지고(문장·책 제목·내 생각·검색용 태그까지),
+// 키보드의 "검색"을 누르면 PC처럼 AI가 한마디와 함께 문장을 골라줌.
+const mSearchVoice = document.getElementById('mSearchVoice');
+const mSearchVoiceText = document.getElementById('mSearchVoiceText');
+const mSearchVoiceDot = document.getElementById('mSearchVoiceDot');
+const mSearch = { mode: 'typing', reqId: 0, query: '' };
+
+function mSearchShowVoice(text, kind, dotColor){
+  mSearchVoiceText.textContent = text;
+  mSearchVoice.classList.toggle('thinking', kind === 'thinking');
+  mSearchVoice.classList.toggle('muted', kind === 'muted');
+  mSearchVoiceDot.style.background = (kind === 'thinking' || kind === 'muted') ? '' : (dotColor || '');
+  mSearchVoice.classList.remove('show');
+  void mSearchVoice.offsetWidth;
+  mSearchVoice.classList.add('show');
+}
+function mSearchHideVoice(){ mSearchVoice.classList.remove('show', 'thinking', 'muted'); }
+
+function searchItemHTML(s, extraClass, i){
+  const color = getCategoryColor(s.category);
+  const meta = [s.source, s.ref].filter(Boolean).map(escapeHtml).join(' · ');
+  // 목록에서 보던 그대로 - 칠해둔 형광펜과 저장(책갈피) 표시를 검색 결과에도 그대로 보여줌
+  const bookmark = s.important ? `<span class="search-result-bookmark">${BOOKMARK_SVG}</span>` : '';
+  const style = extraClass ? ` style="--i:${Math.min(i, 10)}"` : '';
+  return `<div class="search-result-item${extraClass ? ' ' + extraClass : ''}" data-id="${s.id}"${style}>
       <span class="search-result-tag" style="color:${color}">${escapeHtml(s.category)}</span>
       <div class="search-result-text">${renderHighlightedText(s.text, s.highlights)}</div>
       ${(meta || bookmark) ? `<div class="search-result-meta">${bookmark}${meta}</div>` : ''}
     </div>`;
-  }).join('');
+}
+function renderSearchResults(query){
+  searchResultsList.classList.remove('waiting');
+  const q = query.trim().toLowerCase();
+  if(!q){
+    searchResultsList.innerHTML = `<div class="search-empty-hint">궁금한 걸 물어보거나 단어로 찾아보세요</div>`;
+    return;
+  }
+  const matches = sentences.filter(s =>
+    matchesTyping(s.text, q) || matchesTyping(s.source, q) || matchesTyping(s.comment, q) ||
+    matchesTyping(Array.isArray(s.tags) ? s.tags.join(' ') : '', q) || matchesTyping(s.tagWhen, q)
+  );
+  if(matches.length === 0){
+    searchResultsList.innerHTML = `<div class="search-empty-hint"><b>이 단어가 들어간 문장은 없어요</b>검색을 누르면 비슷한 뜻의 문장을 찾아볼게요</div>`;
+    return;
+  }
+  searchResultsList.innerHTML = matches.map(s => searchItemHTML(s)).join('');
 }
 searchInput.addEventListener('input', () => {
+  // 답을 본 뒤 다시 고쳐 쓰기 시작하면 한마디는 내리고 글자 찾기로 돌아감
+  if(mSearch.mode !== 'typing'){ mSearch.reqId++; mSearch.mode = 'typing'; mSearchHideVoice(); }
   renderSearchResults(searchInput.value);
   searchActiveIdx = -1;   // 검색어가 바뀌면 골라둔 위치도 초기화
 });
+async function askPhoneSearch(query){
+  if(mSearch.mode === 'thinking' && mSearch.query === query) return; // 같은 질문 중복(한글 입력 Enter 두 번) 방지
+  const reqId = ++mSearch.reqId;
+  mSearch.mode = 'thinking';
+  mSearch.query = query;
+  mSearchShowVoice('찾는 중이에요', 'thinking');
+  searchResultsList.classList.add('waiting');
+  // 키보드를 내려서 결과가 화면에 다 보이게
+  if(HAS_ONSCREEN_KEYBOARD) searchInput.blur();
+  const startedAt = Date.now();
+  const result = await fetchSearchAnswer(query);
+  const wait = 250 - (Date.now() - startedAt);
+  if(wait > 0) await new Promise(r => setTimeout(r, wait));
+  // 그 사이 창을 닫았거나 다른 걸 다시 물었으면 버림
+  if(reqId !== mSearch.reqId || !searchSheetOverlay.classList.contains('open')) return;
+  searchResultsList.classList.remove('waiting');
+  searchActiveIdx = -1;
+  if(!result){
+    mSearch.mode = 'error';
+    const code = lastAiErrorCode ? ` (${lastAiErrorCode})` : '';
+    mSearchShowVoice('지금은 답을 못 받아왔어요' + code, 'muted');
+    renderSearchResults(query); // 글자로 맞는 문장이라도
+    return;
+  }
+  const list = result.weak ? [] : result.ids.map(id => findSentence(id)).filter(Boolean);
+  mSearch.mode = list.length ? 'answer' : 'nomatch';
+  const top = list[0];
+  mSearchShowVoice(result.reply, list.length ? 'normal' : 'muted', top ? getCategoryColor(top.category) : '');
+  if(!list.length){
+    searchResultsList.innerHTML = `<div class="search-empty-hint"><b>이 질문을 해결해 줄 좋은 문장이 아직 없어요</b>언젠가 책에서 만나게 될 문장이에요</div>`;
+    return;
+  }
+  searchResultsList.innerHTML = list.map((s, i) => searchItemHTML(s, 'search-in', i)).join('');
+  searchResultsList.scrollTop = 0;
+}
 
 // 검색 결과에서 그 문장이 있는 자리로 이동해 잠깐 빛나게 함
 function jumpToSentence(id){
@@ -4853,11 +4944,11 @@ searchInput.addEventListener('keydown', (e) => {
       e.preventDefault();
       e.stopPropagation();
       jumpToSentence(items[searchActiveIdx].dataset.id);
-    } else if(items.length === 1){
-      // 결과가 하나뿐이면 굳이 고르지 않아도 바로 이동
+    } else if(searchInput.value.trim()){
+      // 고른 항목이 없으면 → AI에게 물어봄(폰 키보드의 "검색")
       e.preventDefault();
       e.stopPropagation();
-      jumpToSentence(items[0].dataset.id);
+      askPhoneSearch(searchInput.value.trim());
     }
   }
 });
@@ -6020,16 +6111,9 @@ function tidyReply(text, weak){
   if(!t) t = weak ? '여기에 맞는 영감은 아직 없어요' : '도움이 될 만한 문장들이에요';
   return t;
 }
-async function askSearchAI(query){
-  const reqId = ++searchState.reqId;
-  clearTimeout(localSearchTimer);
-  searchState.mode = 'thinking';
-  searchState.query = query;
-  updateSearchCatPill();
-  setSearchHint('Esc로 돌아가기');
-  setListWaiting(true);
-  showSearchVoice('찾는 중이에요', 'thinking');
-
+// 질문 하나에 대한 답을 구함: 같은 질문을 전에 했으면 기억해둔 답, 아니면 AI에게 물음.
+// 돌려주는 값: { weak(딱 맞는 게 없음), ids(문장 id들), reply(한마디) } 또는 실패 시 null
+async function fetchSearchAnswer(query){
   const pool = sentences.filter(s => (s.text || '').trim());
   // 같은(또는 띄어쓰기·강조어만 다른) 질문을 다시 하면 저번 답을 그대로 보여줌 - 결과가 매번
   // 달라지지 않고, AI도 다시 안 불러서 빠르고 돈도 안 듦. 문장이 바뀌면(추가·수정·태그) 새로 물음.
@@ -6038,13 +6122,7 @@ async function askSearchAI(query){
   const cached = readSearchCache(cacheKey, dataSig);
   if(cached){
     const ids = cached.ids.filter(id => findSentence(id));
-    if(ids.length || cached.weak){
-      setTimeout(() => {
-        if(reqId !== searchState.reqId || viewMode !== 'view') return;
-        applySearchResult({ weak: cached.weak || !ids.length, ids, reply: cached.reply });
-      }, 250); // 아주 잠깐 "찾는 중"을 보여주고 펼침(툭 바뀌지 않게)
-      return;
-    }
+    if(ids.length || cached.weak) return { weak: cached.weak || !ids.length, ids, reply: cached.reply };
   }
   const lines = pool.map((s, idx) => {
     const tagged = Array.isArray(s.tags) && s.tags.length && s.tagWhen;
@@ -6100,6 +6178,25 @@ ${lines}
     result = null;
   }
   searchInFlight = false;
+  if(result) writeSearchCache(cacheKey, dataSig, result);
+  return result;
+}
+async function askSearchAI(query){
+  const reqId = ++searchState.reqId;
+  clearTimeout(localSearchTimer);
+  searchState.mode = 'thinking';
+  searchState.query = query;
+  updateSearchCatPill();
+  setSearchHint('Esc로 돌아가기');
+  setListWaiting(true);
+  showSearchVoice('찾는 중이에요', 'thinking');
+
+  // 찾는 일 자체(기억해둔 답 확인 → AI에게 묻기 → 답 읽기)는 PC·폰이 같은 함수를 씀
+  const startedAt = Date.now();
+  const result = await fetchSearchAnswer(query);
+  // 기억해둔 답이 바로 나와도 아주 잠깐 "찾는 중"을 보여주고 펼침(툭 바뀌지 않게)
+  const wait = 250 - (Date.now() - startedAt);
+  if(wait > 0) await new Promise(r => setTimeout(r, wait));
 
   // 그 사이 다른 걸 다시 물었거나, 입력을 고쳤거나, 화면을 떠났으면 이 답은 버림
   if(reqId !== searchState.reqId || viewMode !== 'view') return;
@@ -6120,7 +6217,6 @@ ${lines}
     }
     return;
   }
-  writeSearchCache(cacheKey, dataSig, result);
   applySearchResult(result);
 }
 function applySearchResult(result){
