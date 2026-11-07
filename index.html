@@ -5958,6 +5958,21 @@ async function askSearchAI(query){
   showSearchVoice('찾는 중이에요', 'thinking');
 
   const pool = sentences.filter(s => (s.text || '').trim());
+  // 같은(또는 띄어쓰기·강조어만 다른) 질문을 다시 하면 저번 답을 그대로 보여줌 - 결과가 매번
+  // 달라지지 않고, AI도 다시 안 불러서 빠르고 돈도 안 듦. 문장이 바뀌면(추가·수정·태그) 새로 물음.
+  const cacheKey = normalizeSearchQuery(query);
+  const dataSig = searchDataSignature(pool);
+  const cached = readSearchCache(cacheKey, dataSig);
+  if(cached){
+    const ids = cached.ids.filter(id => findSentence(id));
+    if(ids.length || cached.weak){
+      setTimeout(() => {
+        if(reqId !== searchState.reqId || viewMode !== 'view') return;
+        applySearchResult({ weak: cached.weak || !ids.length, ids, reply: cached.reply });
+      }, 250); // 아주 잠깐 "찾는 중"을 보여주고 펼침(툭 바뀌지 않게)
+      return;
+    }
+  }
   const lines = pool.map((s, idx) => {
     const tagged = Array.isArray(s.tags) && s.tags.length && s.tagWhen;
     return [
@@ -5979,7 +5994,8 @@ ${lines}
 할 일:
 1. 남영의 말에 정말 도움이 되거나 딱 떠오를 문장만 골라, 가장 잘 맞는 순서로 최대 8개. 개수를 억지로 채우지 마.
 2. 남영의 말이 상황이나 고민이면 그 상황에 실제로 도움이 될 문장을, 단어나 주제면 그 주제의 문장을 골라.
-3. 정말 딱 맞는 문장이 없으면 match를 "weak"로 하고, 그나마 가장 가까운 문장 3개 이하만.
+3. 정말 딱 맞는 문장이 없으면 맞음을 weak로 하고, 그나마 가장 가까운 문장 3개 이하만.
+5. 띄어쓰기·맞춤법이나 "진짜, 너무, 정말" 같은 강조하는 말만 다른 질문은 같은 질문으로 보고, 늘 같은 문장을 같은 순서로 골라. 순서는 질문에 직접 도움이 되는 정도가 높은 순이고, 비슷하면 번호가 작은 순.
 4. reply는 문장들 위에 띄울 한마디야. 한국어 존댓말 한 문장, 공백 포함 26자 이내, "~에요" 또는 "~이에요"로 끝내고 느낌표와 이모지는 쓰지 마. 남영의 말을 짧게 받아서 써(예: "관계가 버거울 때 꺼내볼 영감들이에요", "칭찬이 필요할 때 읽어볼 문장들이에요"). weak면 솔직하게(예: "퇴사에 딱 맞는 문장은 아직 없어요").
 다른 설명 없이 딱 아래 세 줄로만 답해(따옴표·마크다운 없이):
 한마디: 관계가 버거울 때 꺼내볼 영감들이에요
@@ -5989,7 +6005,8 @@ ${lines}
   let result = null;
   searchInFlight = true;
   try{
-    const raw = await callClaude('search', prompt, 1500, 30000);
+    // temperature 0: 같은 질문엔 같은 답이 나오게(기본값은 매번 조금씩 다르게 뽑음)
+    const raw = await callClaude('search', prompt, 1500, 30000, { temperature: 0 });
     const parsed = parseSearchAnswer(raw);
     if(!parsed){
       console.warn('AI 답을 못 읽음 - 원문:', raw);
@@ -6030,6 +6047,11 @@ ${lines}
     }
     return;
   }
+  writeSearchCache(cacheKey, dataSig, result);
+  applySearchResult(result);
+}
+function applySearchResult(result){
+  searchState.lastLocalKey = '';
   searchState.mode = result.weak ? 'nomatch' : 'answer';
   searchState.ids = result.ids;
   searchState.reply = result.reply;
@@ -6037,6 +6059,38 @@ ${lines}
   const top = findSentence(result.ids[0]);
   showSearchVoice(result.reply, result.weak ? 'muted' : 'normal', top ? getCategoryColor(top.category) : '');
   renderSearchView(true);
+}
+
+// ── 같은 질문 기억해두기 ─────────────────────────────────────
+const SEARCH_CACHE_KEY = 'soooo-search-cache';
+function normalizeSearchQuery(q){
+  return (q || '').toLowerCase()
+    .replace(/진짜|정말|너무|완전|엄청|되게|정말로|진심/g, '')
+    .replace(/[\s?!.,~…·'"“”‘’ㅠㅜㅋㅎ^]+/g, '');
+}
+function searchDataSignature(pool){
+  return hashString(pool.map(s => s.id + ':' + (s.tagSig || '') + ':' + (s.category || '')).join('|'));
+}
+function loadSearchCache(){
+  try{ return JSON.parse(localStorage.getItem(SEARCH_CACHE_KEY) || '{}') || {}; }catch(e){ return {}; }
+}
+function readSearchCache(key, sig){
+  if(!key) return null;
+  const all = loadSearchCache();
+  const hit = all[key];
+  if(!hit || hit.sig !== sig || Date.now() - (hit.at || 0) > 7 * 86400000) return null;
+  return hit;
+}
+function writeSearchCache(key, sig, result){
+  if(!key) return;
+  try{
+    const all = loadSearchCache();
+    all[key] = { sig, reply: result.reply, weak: result.weak, ids: result.ids, at: Date.now() };
+    // 너무 쌓이지 않게 최근 60개만
+    const keys = Object.keys(all).sort((a, b) => (all[b].at || 0) - (all[a].at || 0));
+    keys.slice(60).forEach(k => delete all[k]);
+    localStorage.setItem(SEARCH_CACHE_KEY, JSON.stringify(all));
+  }catch(e){}
 }
 
 // AI의 답을 최대한 너그럽게 읽음 - 약속한 세 줄 형식이 기본이지만, JSON이나 마크다운이
@@ -6080,7 +6134,7 @@ function rememberedModel(purpose){
 }
 let lastAiErrorCode = '';   // 마지막 실패 이유(짧게) - 말풍선에 같이 띄워 원인을 알 수 있게
 let searchInFlight = false; // 검색을 묻는 중엔 태그 작업이 잠깐 비켜줌(요청이 한꺼번에 몰리지 않게)
-async function callClaude(purpose, prompt, maxTokens, timeoutMs){
+async function callClaude(purpose, prompt, maxTokens, timeoutMs, extra){
   const remembered = rememberedModel(purpose);
   const candidates = AI_MODEL_CANDIDATES[purpose].slice();
   if(remembered && candidates.includes(remembered)){
@@ -6090,7 +6144,9 @@ async function callClaude(purpose, prompt, maxTokens, timeoutMs){
   lastAiErrorCode = '';
   let lastErr = null;
   for(const model of candidates){
-    // 같은 모델로 최대 2번: 요청이 몰리거나(429) 서버가 바쁠 때(5xx)는 잠깐 쉬었다 한 번 더
+    // 같은 모델로 최대 2번: 요청이 몰리거나(429) 서버가 바쁠 때(5xx)는 잠깐 쉬었다 한 번 더.
+    // temperature를 안 받는 모델이면 그것만 빼고 한 번 더
+    let opts = Object.assign({}, extra || {});
     for(let attempt = 0; attempt < 2; attempt++){
       const ctrl = new AbortController();
       const timer = setTimeout(() => ctrl.abort(), timeoutMs || 30000);
@@ -6099,7 +6155,7 @@ async function callClaude(purpose, prompt, maxTokens, timeoutMs){
         res = await fetch(WORKER_URL + '/classify', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ model, max_tokens: maxTokens, messages: [{ role: 'user', content: prompt }] }),
+          body: JSON.stringify(Object.assign({ model, max_tokens: maxTokens, messages: [{ role: 'user', content: prompt }] }, opts)),
           signal: ctrl.signal
         });
       }catch(err){
@@ -6120,6 +6176,10 @@ async function callClaude(purpose, prompt, maxTokens, timeoutMs){
       console.warn(`AI 요청 실패 [${purpose}] ${model} → ${res.status}`, bodyText.slice(0, 300));
       lastAiErrorCode = String(res.status);
       lastErr = new Error('요청 실패: ' + res.status + ' ' + bodyText.slice(0, 200));
+      if(res.status === 400 && attempt === 0 && 'temperature' in opts && /temperature/i.test(bodyText)){
+        delete opts.temperature;
+        continue;
+      }
       if((res.status === 429 || res.status >= 500) && attempt === 0){
         await new Promise(r => setTimeout(r, res.status === 429 ? 2500 : 1200));
         continue;
