@@ -318,6 +318,162 @@
     to{ opacity: 1; transform: scale(1); }
   }
 
+  /* ── PC 첫 화면: 흩어진 문장이 모이기 ─────────────────────────
+     하얀 화면 곳곳에 내가 모은 문장 조각들이 흐릿하게 떠 있고, 가운데에 워드마크.
+     클릭하거나 아무 키나 누르면 조각들이 가운데 점으로 빨려 들어가며(= "수집") 검색 화면이 열림.
+     조각마다 앞에 그 문장의 카테고리 색 점이 붙어 있어서, 빨려 들어갈 때 색 점들이
+     워드마크의 점 하나로 모이는 그림이 됨.
+     폰은 기존 "입장하기" 화면을 그대로 쓰므로, 마우스 기기에서만 보이게 함
+     (JS의 SKIP_SPLASH와 같은 판정 - 처음부터 CSS로 보여줘야 앱이 먼저 비쳤다 가려지는 깜빡임이 없음). */
+  .intro-overlay{
+    position: fixed;
+    inset: 0;
+    z-index: 520;
+    display: none;
+    background: var(--bg);
+    overflow: hidden;
+    cursor: pointer;
+    user-select: none;
+    -webkit-user-select: none;
+    transition: opacity 0.4s ease-out, background-color 0.5s ease-out;
+  }
+  @media not all and (pointer: coarse){
+    .intro-overlay{ display: block; }
+  }
+  .intro-overlay:focus{ outline: none; }
+  /* 닫힐 때: 흰 배경만 걷히고(뒤의 앱이 드러남), 로고는 머리글 자리로 날아가 앉음.
+     머리글 로고를 못 찾을 때(fading)는 통째로 흐려짐 */
+  .intro-overlay.leave{ background-color: transparent; pointer-events: none; cursor: default; }
+  .intro-overlay.leave.fading{ opacity: 0; }
+  .intro-overlay.gone{ display: none !important; }
+  /* 깊이별로 한 겹씩 - 마우스를 움직이면 겹마다 다른 만큼 따라 움직여서 공간감이 생김 */
+  .intro-layer{
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    transition: transform 0.9s cubic-bezier(.22,1,.36,1);
+  }
+  .intro-overlay.gather .intro-layer{ transform: none !important; transition-duration: 0.35s; }
+  .intro-frag{
+    position: absolute;
+    display: flex;
+    align-items: center;
+    gap: 9px;
+    white-space: nowrap;
+    color: var(--text);
+    letter-spacing: -0.3px;
+    opacity: 0;
+    filter: blur(6px);
+    translate: var(--ex, 0px) var(--ey, 0px);
+    transition-property: opacity, filter, translate, scale;
+    transition-duration: 0.9s;
+    transition-timing-function: cubic-bezier(.22,1,.36,1);
+    will-change: translate, scale, opacity; /* 미리 따로 떼어 그려 두면 움직일 때 다시 그릴 필요가 없음 */
+  }
+  .intro-frag-dot{
+    flex-shrink: 0;
+    width: 7px;
+    height: 7px;
+    border-radius: 50%;
+    background: var(--c, #7FD8F0);
+  }
+  /* 가까운 조각은 크고 진하게, 먼 조각은 작고 옅고 살짝 흐리게 */
+  .intro-layer.d1 .intro-frag{ font-size: 19px; font-weight: 600; }
+  .intro-layer.d2 .intro-frag{ font-size: 16px; font-weight: 500; }
+  .intro-layer.d3 .intro-frag{ font-size: 14px; font-weight: 500; }
+  .intro-layer.d1 .intro-frag.in{ opacity: 0.5; filter: blur(0); }
+  .intro-layer.d2 .intro-frag.in{ opacity: 0.3; filter: blur(0.3px); }
+  .intro-layer.d3 .intro-frag.in{ opacity: 0.17; filter: blur(0.8px); }
+  .intro-frag.in{ translate: 0px 0px; }
+  /* 가만히 있어도 아주 천천히 떠다님 */
+  .intro-frag-in{
+    display: flex;
+    align-items: center;
+    gap: 9px;
+    animation: introFloat var(--fd, 12s) ease-in-out var(--fdelay, 0s) infinite alternate;
+  }
+  @keyframes introFloat{
+    from{ transform: translate(0, 0); }
+    to{ transform: translate(var(--fx, 8px), var(--fy, -6px)); }
+  }
+  /* 모이기 - 가운데 점을 향해 점점 빨라지며(ease-in) 작아지고 사라짐 */
+  .intro-overlay.gather .intro-frag{
+    translate: var(--gx, 0px) var(--gy, 0px);
+    scale: 0.04;
+    opacity: 0;
+    /* 흐림(filter)은 움직이는 동안 매 순간 다시 그려야 해서 버벅임의 원인 - 모일 때는 위치·크기·투명도만 바꿈 */
+    transition-property: opacity, translate, scale;
+    transition-duration: 0.38s, 0.48s, 0.48s; /* opacity만 짧게 - 점에 닿기 직전에 이미 다 사라져서 점 옆에 찌꺼기가 안 남음 */
+    transition-timing-function: cubic-bezier(.55,0,.8,.3);
+    transition-delay: var(--gd, 0ms) !important;
+  }
+  .intro-center{
+    position: absolute;
+    z-index: 2; /* 모여든 조각들이 점 뒤로 들어가게 */
+    left: 50%;
+    top: 50%;
+    transform: translate(-50%, -50%);
+    display: flex;
+    align-items: center;
+    gap: 22px;
+    font-family: 'Pretendard', sans-serif;
+    /* 머리글 로고(17px·700·간격 7px·점 8px)를 그대로 키운 비율 - 날아가 앉을 때 모양이 딱 겹치게 */
+    font-size: 54px;
+    font-weight: 700;
+    letter-spacing: -0.6px;
+    white-space: nowrap;
+    color: var(--text);
+    opacity: 0;
+    filter: blur(6px);
+    scale: 0.97;
+    transition: opacity 0.7s cubic-bezier(.22,1,.36,1), filter 0.7s cubic-bezier(.22,1,.36,1), scale 0.7s cubic-bezier(.22,1,.36,1);
+    transform-origin: 50% 50%;
+  }
+  .intro-center.fly{
+    transition: transform 0.56s cubic-bezier(.65,0,.25,1);
+    will-change: transform;
+  }
+  .intro-center span:not(.intro-center-dot){ line-height: 1; }
+  .intro-overlay.ready .intro-center{ opacity: 1; filter: blur(0); scale: 1; }
+  .intro-center-dot{
+    flex-shrink: 0;
+    width: 25px;
+    height: 25px;
+    border-radius: 50%;
+    background: #7FD8F0;
+    transform: translateY(1.5px);
+    transition: background-color 0.56s ease;
+  }
+  /* 조각들이 다 빨려 들어온 순간, 점이 한 번 꿀꺽 부풀었다 돌아옴 */
+  .intro-overlay.absorb .intro-center-dot{ animation: introGulp 0.36s cubic-bezier(.22,1,.36,1); }
+  @keyframes introGulp{
+    0%{ scale: 1; }
+    40%{ scale: 1.45; }
+    100%{ scale: 1; }
+  }
+  .intro-hint{
+    position: absolute;
+    left: 50%;
+    bottom: 56px;
+    transform: translateX(-50%);
+    font-size: 13.5px;
+    font-weight: 600;
+    color: var(--text-tertiary);
+    letter-spacing: -0.2px;
+    white-space: nowrap;
+    opacity: 0;
+    transition: opacity 0.8s ease-out;
+  }
+  .intro-overlay.hint-on .intro-hint{ opacity: 1; }
+  .intro-overlay.gather .intro-hint{ opacity: 0; transition-duration: 0.2s; }
+  @media (prefers-reduced-motion: reduce){
+    .intro-frag-in{ animation: none; }
+    .intro-layer{ transition: none; }
+    .intro-frag, .intro-center{ transition-duration: 0.2s; filter: none !important; }
+    .intro-overlay.gather .intro-frag{ translate: 0px 0px; scale: 1; transition-duration: 0.2s; }
+    .intro-overlay.absorb .intro-center-dot{ animation: none; }
+  }
+
   /* ── 보관함 (카테고리별 문장 목록) - 메인 화면 ──── */
   .archive-header{
     display: flex;
@@ -1506,6 +1662,10 @@
   }
   body.search-active .scroll-region::-webkit-scrollbar{ display: none; }
   body.search-active .compose-top-fade{ display: block; }
+  /* 맨 위 흐림 띠가 머리글 로고까지 덮어서 로고가 늘 뿌옇게 보였음 - 로고줄만 띠 위로 올림
+     (스크롤하면 로고줄도 같이 올라가 사라지므로, 아래 문장들이 흐려지는 효과는 그대로) */
+  body.search-active .archive-header,
+  body.compose-active .archive-header{ z-index: 65; }
   body.search-active .add-quote-trigger-btn{ opacity: 0; pointer-events: none; }
   body.search-active.search-empty .search-bar .compose-send-btn{
     background: var(--border);
@@ -2467,6 +2627,19 @@
     </div>
     <button type="button" class="splash-btn" id="splashBtn">입장하기</button>
   </div>
+</div>
+
+<!-- PC 첫 화면 - 내가 모은 문장 조각들이 떠 있다가, 클릭하거나 아무 키나 누르면
+     가운데로 모이며 검색 화면이 열림. 폰에서는 CSS가 감춰 둠(폰은 위의 "입장하기" 화면). -->
+<div class="intro-overlay" id="introOverlay" aria-label="soooo.zip 시작 화면">
+  <div class="intro-layer d3" data-depth="3"></div>
+  <div class="intro-layer d2" data-depth="2"></div>
+  <div class="intro-layer d1" data-depth="1"></div>
+  <div class="intro-center" id="introCenter">
+    <span class="intro-center-dot" id="introCenterDot"></span>
+    <span>soooo.zip</span>
+  </div>
+  <div class="intro-hint">클릭하거나 아무 키나 눌러 들어가기</div>
 </div>
 
 <!-- 컴퓨터 편집 모드 전용: 실제 스크롤은 이 판(화면 전체 폭)이 담당함.
@@ -6621,7 +6794,7 @@ async function runTagQueue(){
     while(true){
       const pending = sentences.filter(needsTagging);
       if(!pending.length) break;
-      while(searchInFlight) await new Promise(r => setTimeout(r, 500)); // 검색이 먼저
+      while(searchInFlight || introBusy) await new Promise(r => setTimeout(r, 500)); // 검색이 먼저, 첫 화면이 떠 있는 동안도 쉬기(움직임이 끊기지 않게)
       const batch = pending.slice(0, TAG_BATCH_SIZE);
       const sigs = batch.map(tagSourceSig);
       batch.forEach(s => tagAttemptCount.set(s.id, (tagAttemptCount.get(s.id) || 0) + 1));
@@ -7808,10 +7981,279 @@ function pickSplashSub(quoteCount){
   return pool[Math.floor(rand() * pool.length)];
 }
 
+// ── PC 첫 화면: 흩어진 문장이 모이기 ─────────────────────────
+// 문장 조각을 화면 곳곳에 흩뿌려 두고, 클릭이나 아무 키를 누르면 가운데 점으로 모으며 닫음.
+// 조각은 들어올 때마다 무작위로 다시 뽑아서, 열 때마다 다른 문장들이 떠 있음.
+const introOverlay = document.getElementById('introOverlay');
+let introOpen = SKIP_SPLASH && !!introOverlay;
+let introCanLeave = false;
+let introBusy = introOpen; // 닫히는 움직임이 끝날 때까지 true - 그동안 무거운 뒷일(태그 작업)은 쉼
+
+// 문장에서 짧은 조각 하나 - 칠해둔 부분이 있으면 그걸, 없으면 첫 마디를 씀
+function introSnippet(s){
+  // 앞뒤 따옴표는 짝이 안 맞을 때만 뗌 - "'좋은 사람'이 되는…"처럼 짝이 있는 건 그대로 둬야 안 어색함
+  const PAIRS = { '"': '"', '“': '”', "'": "'", '‘': '’' };
+  const clean = (t) => {
+    let x = (t || '').replace(/\s+/g, ' ').trim();
+    const open = PAIRS[x[0]];
+    if(open && x.indexOf(open, 1) === -1) x = x.slice(1).trim();
+    const last = x[x.length - 1];
+    const opener = Object.keys(PAIRS).find(k => PAIRS[k] === last);
+    if(opener && x.slice(0, -1).indexOf(opener) === -1) x = x.slice(0, -1).trim();
+    return x;
+  };
+  const text = clean(s.text);
+  if(!text) return '';
+  const hs = (s.highlights || []).map(h => clean(text.slice(h.start, h.end))).filter(h => h.length >= 6 && h.length <= 26);
+  if(hs.length) return hs[0];
+  const first = text.split(/(?<=[.!?…])\s/)[0];
+  if(first.length <= 24) return clean(first);
+  let cut = first.slice(0, 22);
+  const sp = cut.lastIndexOf(' ');
+  if(sp >= 10) cut = cut.slice(0, sp);
+  return clean(cut.replace(/[,.\s]+$/, '')) + '…';
+}
+
+function buildIntroFragments(){
+  if(!introOpen) return;
+  const layers = [...introOverlay.querySelectorAll('.intro-layer')];
+  layers.forEach(l => { l.innerHTML = ''; l.style.transform = ''; });
+  const pool = sentences.filter(s => (s.text || '').trim());
+  if(!pool.length) return;
+  // 무작위로 섞어서 앞에서부터 씀
+  const picks = pool.slice();
+  for(let i = picks.length - 1; i > 0; i--){
+    const j = Math.floor(Math.random() * (i + 1));
+    [picks[i], picks[j]] = [picks[j], picks[i]];
+  }
+  const W = window.innerWidth, H = window.innerHeight;
+  const want = Math.max(8, Math.min(16, Math.round(W * H / 70000)));
+
+  // 1) 후보 조각을 한꺼번에 만들어 넣고(아직 안 보이게) → 2) 크기를 한 번에 잼 → 3) 자리 배치.
+  //    하나 넣고 재고, 또 넣고 재고 하면 그때마다 화면 계산을 새로 해서 첫 순간이 버벅였음.
+  const cands = [];
+  for(const s of picks){
+    if(cands.length >= want * 2) break;
+    const snip = introSnippet(s);
+    if(!snip) continue;
+    const depth = cands.length % 5 === 0 ? 1 : (cands.length % 5 <= 2 ? 2 : 3); // 가까운 것 적게, 먼 것 많게
+    const layer = layers.find(l => l.dataset.depth === String(depth));
+    const el = document.createElement('div');
+    el.className = 'intro-frag';
+    el.innerHTML = '<div class="intro-frag-in"><span class="intro-frag-dot"></span><span></span></div>';
+    el.querySelector('span:last-child').textContent = snip;
+    el.style.setProperty('--c', getCategoryColor(s.category));
+    el.style.visibility = 'hidden';
+    layer.appendChild(el);
+    cands.push(el);
+  }
+  const sizes = cands.map(el => [el.offsetWidth, el.offsetHeight]);
+  // 가운데 워드마크와 아래 안내 글씨 자리는 비워 둠
+  const center = document.getElementById('introCenter').getBoundingClientRect();
+  const hint = introOverlay.querySelector('.intro-hint').getBoundingClientRect();
+  const dot = document.getElementById('introCenterDot').getBoundingClientRect();
+  const keepOut = [
+    { l: center.left - 70, t: center.top - 60, r: center.right + 70, b: center.bottom + 60 },
+    { l: hint.left - 40, t: hint.top - 30, r: hint.right + 40, b: H }
+  ];
+  const hit = (a, b) => !(a.r < b.l || a.l > b.r || a.b < b.t || a.t > b.b);
+  // 완전 무작위면 한쪽에 몰리고 한쪽이 텅 비어서, 화면을 칸으로 나눠 칸을 섞어 가며 하나씩 채움
+  const COLS = 4, ROWS = 6;
+  const cells = [];
+  for(let r = 0; r < ROWS; r++) for(let c = 0; c < COLS; c++) cells.push({ c, r });
+  for(let i = cells.length - 1; i > 0; i--){
+    const j = Math.floor(Math.random() * (i + 1));
+    [cells[i], cells[j]] = [cells[j], cells[i]];
+  }
+  let cellIdx = 0;
+  const placed = [];
+  const dotX = dot.left + dot.width / 2, dotY = dot.top + dot.height / 2;
+  let made = 0;
+  cands.forEach((el, k) => {
+    if(made >= want){ el.remove(); return; }
+    const [w, h] = sizes[k];
+    let spot = null;
+    for(let tries = 0; tries < 40 && !spot; tries++){
+      // 처음 몇 번은 지금 칸 안에서, 안 되면 다음 칸으로 넘어가며 찾음
+      if(tries % 5 === 0 && tries) cellIdx++;
+      const cell = cells[cellIdx % cells.length];
+      const cw = (W - 80) / COLS, ch = (H - 80) / ROWS;
+      const x = Math.min(W - 40 - w, Math.max(40, 40 + cell.c * cw + Math.random() * cw - w / 2));
+      const y = Math.min(H - 40 - h, Math.max(40, 40 + cell.r * ch + Math.random() * ch - h / 2));
+      const box = { l: x - 24, t: y - 18, r: x + w + 24, b: y + h + 18 };
+      if(keepOut.some(z => hit(box, z)) || placed.some(p => hit(box, p))) continue;
+      spot = { x, y, box };
+    }
+    cellIdx++;
+    if(!spot){ el.remove(); return; }
+    placed.push(spot.box);
+    el.style.left = spot.x + 'px';
+    el.style.top = spot.y + 'px';
+    // 들어올 때는 바깥쪽에서 살짝 안으로, 모일 때는 가운데 점으로
+    const cx = spot.x + w / 2, cy = spot.y + h / 2;
+    const dx = cx - W / 2, dy = cy - H / 2;
+    const len = Math.hypot(dx, dy) || 1;
+    el.style.setProperty('--ex', (dx / len * 18).toFixed(1) + 'px');
+    el.style.setProperty('--ey', (dy / len * 18).toFixed(1) + 'px');
+    // 조각 앞의 색 점(가운데가 왼쪽에서 3.5px)이 로고 점 살짝 안쪽으로 가게 - 다 작아진 찌꺼기가 큰 점 뒤로 숨음
+    el.style.setProperty('--gx', (dotX - 4 - (spot.x + 3.5)).toFixed(1) + 'px');
+    el.style.setProperty('--gy', (dotY - cy).toFixed(1) + 'px');
+    // 먼 조각일수록 조금 늦게 출발 - 한꺼번에 똑같이 움직이면 기계적으로 보임
+    el.style.setProperty('--gd', Math.round(Math.min(110, len / 8) * (0.6 + Math.random() * 0.4)) + 'ms');
+    el.style.transformOrigin = '3.5px 50%';
+    const inner = el.firstChild;
+    inner.style.setProperty('--fx', (Math.random() * 16 - 8).toFixed(1) + 'px');
+    inner.style.setProperty('--fy', (Math.random() * 12 - 6).toFixed(1) + 'px');
+    inner.style.setProperty('--fd', (9 + Math.random() * 8).toFixed(1) + 's');
+    inner.style.setProperty('--fdelay', (-Math.random() * 8).toFixed(1) + 's');
+    el.style.transitionDelay = (120 + made * 70) + 'ms';
+    el.style.visibility = '';
+    made++;
+  });
+  // 다음 프레임에 들어오기 시작(바로 넣으면 시작 상태가 그려지기 전이라 움직임이 안 보임)
+  requestAnimationFrame(() => requestAnimationFrame(() => {
+    if(!introOpen) return;
+    introOverlay.querySelectorAll('.intro-frag').forEach(f => f.classList.add('in'));
+  }));
+}
+
+// 로고를 또렷하게 띄우는 시점 - 앱이 처음 그려지는 무거운 순간과 겹치면 서서히 나타나는 게
+// 뚝뚝 끊겨 보여서, 데이터를 다 읽고 첫 화면을 그린 뒤에 시작함(너무 늦으면 0.7초에 그냥 시작)
+let introReadyTimer = null;
+function revealIntroCenter(){
+  clearTimeout(introReadyTimer);
+  if(!introOpen || introOverlay.classList.contains('ready')) return;
+  requestAnimationFrame(() => introOverlay.classList.add('ready'));
+  setTimeout(() => { if(introOpen) introOverlay.classList.add('hint-on'); }, 1300);
+}
+
+function startIntro(){
+  if(!introOpen){ if(introOverlay) introOverlay.classList.add('gone'); return; }
+  if(document.activeElement && document.activeElement.blur) document.activeElement.blur();
+  introOverlay.focus({ preventScroll: true });
+  introReadyTimer = setTimeout(revealIntroCenter, 700);
+  setTimeout(() => { introCanLeave = true; }, 250);
+  // 마우스를 따라 겹마다 다른 만큼 살짝 움직임(가까운 겹이 더 많이).
+  // 마우스 이벤트는 1초에 수십~수백 번 오므로, 화면이 한 번 그려질 때마다 한 번만 반영함
+  if(!window.matchMedia('(prefers-reduced-motion: reduce)').matches){
+    let pending = null;
+    introOverlay.addEventListener('mousemove', (e) => {
+      if(!introOpen) return;
+      const first = !pending;
+      pending = [e.clientX, e.clientY];
+      if(!first) return;
+      requestAnimationFrame(() => {
+        if(!introOpen || !pending){ pending = null; return; }
+        const nx = (pending[0] / window.innerWidth - 0.5) * 2;
+        const ny = (pending[1] / window.innerHeight - 0.5) * 2;
+        pending = null;
+        introOverlay.querySelectorAll('.intro-layer').forEach(l => {
+          const k = { 1: 16, 2: 9, 3: 4 }[l.dataset.depth] || 0;
+          l.style.transform = `translate(${(-nx * k).toFixed(1)}px, ${(-ny * k).toFixed(1)}px)`;
+        });
+      });
+    });
+  }
+}
+
+// 큰 로고가 위쪽 머리글의 작은 로고 자리로 날아가 앉음 - 첫 화면과 앱이 끊기지 않고 이어지게.
+// 머리글 로고와 크기·위치를 재서 그만큼만 옮기고 줄임(FLIP). 머리글 로고를 못 찾으면 그냥 흐려짐.
+function flyIntroLogo(){
+  const center = document.getElementById('introCenter');
+  const head = document.getElementById('wordmark');
+  const hDot = head && head.querySelector('.wordmark-dot');
+  const hText = head && head.querySelector('.wordmark-text');
+  if(!hDot || !hText) return null;
+  const a = hDot.getBoundingClientRect(), b = hText.getBoundingClientRect();
+  if(!a.width || !b.width || b.bottom < 0) return null;
+  // 큰 로고 쪽은 화면 좌표(getBoundingClientRect) 대신 배치 값(offset)으로 잼 - 이 순간 점이
+  // "꿀꺽" 부풀어 있어서 화면 좌표로 재면 점이 커진 만큼 어긋나 착지할 때 글자가 두 겹으로 보였음
+  const cr = center.getBoundingClientRect();
+  const iDotEl = document.getElementById('introCenterDot'), iTextEl = center.lastElementChild;
+  const iLeft = cr.left + iDotEl.offsetLeft;
+  const iRight = cr.left + iTextEl.offsetLeft + iTextEl.offsetWidth;
+  const iMidY = cr.top + iTextEl.offsetTop + iTextEl.offsetHeight / 2;
+  const s = (b.right - a.left) / (iRight - iLeft);
+  const dx = (a.left + b.right) / 2 - (iLeft + iRight) / 2;
+  const dy = (b.top + b.height / 2) - iMidY;
+  head.style.opacity = '0';
+  document.getElementById('introCenterDot').style.background = getComputedStyle(hDot).backgroundColor;
+  center.classList.add('fly');
+  center.style.transform = `translate(-50%, -50%) translate(${dx.toFixed(1)}px, ${dy.toFixed(1)}px) scale(${s.toFixed(4)})`;
+  return head;
+}
+
+function leaveIntro(){
+  if(!introOpen || !introCanLeave) return;
+  introOpen = false;
+  clearTimeout(introReadyTimer);
+  const reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  const frags = [...introOverlay.querySelectorAll('.intro-frag')];
+  // 마지막 조각이 점에 닿는 순간에 맞춰 점이 꿀꺽 - 늦게 출발한 조각까지 기다림
+  const lastArrive = frags.reduce((m, f) => Math.max(m, parseFloat(f.style.getPropertyValue('--gd')) || 0), 0) + 480;
+  introOverlay.classList.add('ready', 'gather');
+  const absorbAt = reduce || !frags.length ? 0 : lastArrive;
+  setTimeout(() => introOverlay.classList.add('absorb'), absorbAt);
+  const flyAt = absorbAt + (reduce || !frags.length ? 0 : 60);
+  setTimeout(() => {
+    const head = reduce ? null : flyIntroLogo();
+    introOverlay.classList.add('leave', head ? 'flying' : 'fading');
+    // 배경이 걷히는 순간부터 바로 칠 수 있게 커서를 검색창으로
+    if(viewMode === 'view' && document.body.classList.contains('search-active')) searchBarInput.focus({ preventScroll: true });
+    const done = head ? 580 : (reduce ? 220 : 420);
+    // 다 내려앉은 순간 같은 프레임에 진짜 머리글 로고로 바꿔 끼움 - 크기·위치가 딱 겹치게 맞춰 둬서
+    // 바뀌는 순간이 안 보임(미리 겹쳐 보이게 하면 아직 날아오는 중이라 로고가 두 겹으로 보였음)
+    setTimeout(() => {
+      if(head) head.style.opacity = '';
+      introOverlay.classList.add('gone');
+      introOverlay.querySelectorAll('.intro-layer').forEach(l => { l.innerHTML = ''; });
+      setTimeout(() => { introBusy = false; }, 1200);
+    }, done);
+  }, flyAt);
+}
+
+if(introOverlay){
+  introOverlay.addEventListener('click', leaveIntro);
+  // 첫 화면이 떠 있는 동안 누른 키는 검색창이나 단축키로 새지 않게 여기서 막고 들어가기만 함.
+  // (Cmd/Ctrl/Alt를 같이 누른 건 새로고침 같은 브라우저 동작이라 건드리지 않음)
+  window.addEventListener('keydown', (e) => {
+    if(!introOpen) return;
+    if(e.metaKey || e.ctrlKey || e.altKey) return;
+    if(['Shift', 'Control', 'Alt', 'Meta', 'CapsLock'].includes(e.key)) return;
+    e.preventDefault();
+    e.stopImmediatePropagation();
+    if(!e.repeat) leaveIntro();
+  }, true);
+  // 첫 화면이 떠 있는 동안에는 검색창이 커서를 잡지 않게 함 - 한글 입력기가 켜져 있으면
+  // 키를 막아도 첫 글자가 조합 중으로 검색창에 들어가 버릴 수 있어서, 아예 커서를 첫 화면이 들고 있음
+  introOverlay.tabIndex = -1;
+  document.addEventListener('focusin', (e) => {
+    if(!introOpen) return;
+    if(e.target !== introOverlay && e.target.matches && e.target.matches('input, textarea, [contenteditable]')){
+      e.target.blur();
+      introOverlay.focus({ preventScroll: true });
+    }
+  }, true);
+  // 창 크기를 바꾸면 다 바꾼 뒤에 한 번만 다시 배치(끄는 동안 계속 다시 그리면 깜빡거림)
+  let introResizeTimer = null;
+  window.addEventListener('resize', () => {
+    if(!introOpen) return;
+    clearTimeout(introResizeTimer);
+    introResizeTimer = setTimeout(() => { if(introOpen) buildIntroFragments(); }, 250);
+  });
+}
+startIntro();
+
 loadAll().then(() => {
   // PC는 시작 화면을 건너뛰므로, 숫자 세기·배경 만들기 같은 준비도 할 필요가 없음
   if(SKIP_SPLASH){
     splashDismissed = true;
+    // 웹폰트(Pretendard)가 늦게 오면 글자 폭이 바뀌어 조각끼리 겹칠 수 있어서, 폰트가 준비된 뒤에 잼(최대 0.8초만 기다림)
+    const fontsReady = document.fonts && document.fonts.ready ? Promise.race([document.fonts.ready, new Promise(r => setTimeout(r, 800))]) : Promise.resolve();
+    fontsReady.then(() => {
+      revealIntroCenter();
+      buildIntroFragments();
+    });
     return;
   }
   const wait = Math.max(0, SPLASH_MIN_MS - (Date.now() - splashStart));
