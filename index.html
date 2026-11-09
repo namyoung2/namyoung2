@@ -722,6 +722,34 @@
   .pintro.leaving{ background-color: transparent; pointer-events: none; }
   .pintro.leaving .pintro-blob{ opacity: 0; }
   .pintro.leaving .pintro-count, .pintro.leaving .pintro-hint{ opacity: 0; transition: opacity 0.2s ease-out; }
+  /* 카드가 자리에 내려앉으면, 첫 화면에서 읽었던 바로 그 부분 위로 빛줄기가 한 번 쓱 지나감 -
+     "첫 화면의 그 문장이 여기예요" 힌트. 글자를 빛줄기 무늬로 칠하고(background-clip: text) 무늬를 옆으로 밀어서 지나가게 함 */
+  .pintro-read{
+    /* 빛줄기 한가운데는 하얀색 대신 카테고리 색을 진하게 - 연한 카드 배경 위에서 글자가 하얗게 사라지지 않고
+       색으로 환하게 물들며 지나가게 */
+    background-image: linear-gradient(100deg,
+      var(--text) 0%, var(--text) 34%,
+      color-mix(in srgb, var(--category-color) 70%, var(--text)) 42%,
+      color-mix(in srgb, var(--category-color) 100%, #000 8%) 50%,
+      color-mix(in srgb, var(--category-color) 70%, var(--text)) 58%,
+      var(--text) 66%, var(--text) 100%);
+    background-size: 260% 100%;
+    background-position: 100% 0;
+    -webkit-background-clip: text;
+    background-clip: text;
+    -webkit-text-fill-color: transparent;
+    color: transparent;
+    -webkit-box-decoration-break: clone;
+    box-decoration-break: clone;
+    animation: pintroSheen 1.5s cubic-bezier(.45,.05,.35,1) forwards;
+  }
+  @keyframes pintroSheen{
+    from{ background-position: 100% 0; }
+    to{ background-position: 0% 0; }
+  }
+  @media (prefers-reduced-motion: reduce){
+    .pintro-read{ animation: none; background: none; -webkit-text-fill-color: currentColor; color: inherit; }
+  }
   /* 로고도 문장 카드와 같은 곡선으로 - 처음엔 빠르게 출발해 끝에서 부드럽게 멈춤(아이폰 화면 전환 느낌) */
   .pintro.leaving .pintro-wm{ transition: transform 0.66s cubic-bezier(.32,.72,0,1); }
   @media (prefers-reduced-motion: reduce){
@@ -8590,6 +8618,7 @@ function pickSplashSub(quoteCount){
 const pIntro = document.getElementById('pIntro');
 let pIntroOpen = USE_SINGLE_INTRO && !!pIntro;
 let pIntroSentenceId = null;
+let pIntroRange = null; // 첫 화면에 보였던 부분이 전체 문장의 어디인지
 if(pIntro && !USE_SINGLE_INTRO) pIntro.classList.add('gone');
 
 // 첫 화면에 보여줄 만큼만 - 칠해 둔 부분 → 첫 문장 → 80자 근처에서 끊기
@@ -8599,16 +8628,44 @@ function phoneIntroExcerpt(s){
   const hs = (s.highlights || [])
     .map(h => ({ t: raw.slice(h.start, h.end).replace(/\s+/g, ' ').trim(), atStart: h.start <= 1, atEnd: h.end >= raw.trim().length - 1 }))
     .filter(h => h.t.length >= 8 && h.t.length <= 90);
+  // range: 카드(전체 문장)에서 첫 화면에 보였던 부분의 위치 - 들어간 뒤 그 부분에 빛이 지나감
+  const hRaw = (s.highlights || []).find(h => { const t = raw.slice(h.start, h.end).replace(/\s+/g, ' ').trim(); return t.length >= 8 && t.length <= 90; });
+  const firstEndRaw = (() => { const m = raw.match(/^[\s\S]*?[.!?…](?=\s|$)/); return m ? m[0].length : raw.length; })();
   if(hs.length){
     const h = hs[0];
-    return { text: (h.atStart ? '' : '… ') + h.t + (h.atEnd || /[.!?…]$/.test(h.t) ? '' : ' …'), more: '칠해 둔 부분이에요 · 전체 문장은 안에서' };
+    return { text: (h.atStart ? '' : '… ') + h.t + (h.atEnd || /[.!?…]$/.test(h.t) ? '' : ' …'), more: '칠해 둔 부분이에요 · 전체 문장은 안에서', range: hRaw ? [hRaw.start, hRaw.end] : null };
   }
   const first = text.split(/(?<=[.!?…])\s/)[0];
-  if(first.length <= 90) return { text: first, more: first.length < text.length ? '이어지는 내용은 안에서' : '' };
+  if(first.length <= 90) return { text: first, more: first.length < text.length ? '이어지는 내용은 안에서' : '', range: [0, firstEndRaw] };
   let cut = first.slice(0, 80);
   const sp = cut.lastIndexOf(' ');
   if(sp > 50) cut = cut.slice(0, sp);
-  return { text: cut.replace(/[,.\s]+$/, '') + '…', more: '이어지는 내용은 안에서' };
+  return { text: cut.replace(/[,.\s]+$/, '') + '…', more: '이어지는 내용은 안에서', range: [0, firstEndRaw] };
+}
+
+// 카드 글 안의 [start, end) 부분을 span으로 감쌈(형광펜 <mark>가 섞여 있어도 글자 조각마다 따로 감쌈).
+// 돌려준 함수를 부르면 원래대로 풀어 둠
+function wrapTextRange(container, start, end, cls){
+  const walker = document.createTreeWalker(container, NodeFilter.SHOW_TEXT);
+  const segs = [];
+  let pos = 0, node;
+  while((node = walker.nextNode())){
+    const len = node.nodeValue.length;
+    const a = Math.max(0, start - pos), b = Math.min(len, end - pos);
+    if(b > a) segs.push([node, a, b]);
+    pos += len;
+  }
+  const spans = segs.map(([n, a, b]) => {
+    let t = n;
+    if(a > 0) t = t.splitText(a);
+    if(b - a < t.nodeValue.length) t.splitText(b - a);
+    const sp = document.createElement('span');
+    sp.className = cls;
+    t.parentNode.insertBefore(sp, t);
+    sp.appendChild(t);
+    return sp;
+  });
+  return () => spans.forEach(sp => { if(sp.parentNode){ while(sp.firstChild) sp.parentNode.insertBefore(sp.firstChild, sp); sp.remove(); } });
 }
 
 function buildPhoneIntro(){
@@ -8623,6 +8680,7 @@ function buildPhoneIntro(){
   if(s){
     pIntroSentenceId = s.id;
     const ex = phoneIntroExcerpt(s);
+    pIntroRange = ex.range;
     const t = document.getElementById('pIntroText');
     t.textContent = ex.text;
     t.classList.toggle('mid', ex.text.length > 40 && ex.text.length <= 65);
@@ -8683,6 +8741,15 @@ function leavePhoneIntro(){
       { backgroundColor: 'rgba(255,255,255,0)', offset: 0.5 },
       { transform: 'none', opacity: 1, backgroundColor: tint }
     ], { duration: DUR, easing: EASE, fill: 'backwards' });
+    // 내려앉으면 첫 화면에서 읽었던 그 부분 위로 빛줄기가 한 번 지나감
+    if(pIntroRange){
+      setTimeout(() => {
+        const qt = card.querySelector('.quote-text');
+        if(!qt) return;
+        const unwrap = wrapTextRange(qt, pIntroRange[0], pIntroRange[1], 'pintro-read');
+        setTimeout(unwrap, 1600);
+      }, DUR - 120);
+    }
     main.animate([
       { translate: '0 0', opacity: 1 },
       { opacity: 0, offset: 0.18 },
