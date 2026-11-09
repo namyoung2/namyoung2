@@ -381,12 +381,62 @@
   .intro-layer.d1 .intro-frag{ font-size: 19px; font-weight: 600; }
   .intro-layer.d2 .intro-frag{ font-size: 16px; font-weight: 500; }
   .intro-layer.d3 .intro-frag{ font-size: 14px; font-weight: 500; }
-  .intro-layer.d1 .intro-frag.in{ opacity: 0.5; filter: blur(0); }
-  .intro-layer.d2 .intro-frag.in{ opacity: 0.3; filter: blur(0.3px); }
-  .intro-layer.d3 .intro-frag.in{ opacity: 0.17; filter: blur(0.8px); }
-  .intro-frag.in{ translate: 0px 0px; }
+  /* 깊이별 기본 밝기·흐림. 마우스가 가까이 오면(--near 0→1) 밝고 또렷해지고 아주 살짝 커짐 -
+     손전등으로 비추듯 커서 주변 문장만 떠오름 */
+  .intro-layer.d1 .intro-frag{ --base: 0.5; --blur: 0px; }
+  .intro-layer.d2 .intro-frag{ --base: 0.3; --blur: 0.3px; }
+  .intro-layer.d3 .intro-frag{ --base: 0.17; --blur: 0.8px; }
+  .intro-frag.in{
+    translate: 0px 0px;
+    opacity: calc(var(--base) + (0.92 - var(--base)) * var(--near, 0));
+    filter: blur(calc(var(--blur) * (1 - var(--near, 0))));
+    scale: calc(1 + var(--near, 0) * 0.035);
+  }
+  /* 다 들어온 뒤에는 마우스 반응이 바로바로 따라오게(들어올 때의 느린 시간·지연을 지움) */
+  .intro-frag.in.settled{ transition-duration: 0.35s; transition-delay: 0s !important; pointer-events: auto; }
+  /* 바로 위에 올렸을 때: 색 점이 빛나고, 글자가 진해지고, 아래로 출처가 살며시 나옴 */
+  .intro-frag.lit{ --near: 1 !important; }
+  .intro-frag-dot{ transition: box-shadow 0.3s ease-out, scale 0.3s ease-out; }
+  .intro-frag.lit .intro-frag-dot{
+    scale: 1.35;
+    box-shadow: 0 0 0 3px color-mix(in srgb, var(--c) 22%, transparent), 0 0 14px 3px color-mix(in srgb, var(--c) 70%, transparent);
+  }
+  .intro-frag-src{
+    position: absolute;
+    left: 16px;
+    top: calc(100% + 3px);
+    font-size: 12px;
+    font-weight: 500;
+    letter-spacing: -0.1px;
+    color: var(--text-tertiary);
+    white-space: nowrap;
+    opacity: 0;
+    translate: 0 -3px;
+    transition: opacity 0.25s ease-out, translate 0.25s ease-out;
+    pointer-events: none;
+  }
+  .intro-frag.lit .intro-frag-src{ opacity: 1; translate: 0 0; }
+  /* 커서를 따라다니는 아주 옅은 빛 */
+  @property --gc{ syntax: '<color>'; inherits: false; initial-value: #7FD8F0; }
+  .intro-glow{
+    position: absolute;
+    left: -280px;
+    top: -280px;
+    width: 560px;
+    height: 560px;
+    border-radius: 50%;
+    /* 평소엔 로고 점 색, 문장 위에 올리면 그 문장의 카테고리 색으로 천천히 물듦 */
+    background: radial-gradient(circle, color-mix(in srgb, var(--gc) 17%, transparent) 0%, color-mix(in srgb, var(--gc) 6%, transparent) 38%, transparent 68%);
+    pointer-events: none;
+    opacity: 0;
+    transition: opacity 0.6s ease-out, transform 0.5s cubic-bezier(.22,1,.36,1), --gc 0.6s ease;
+    will-change: transform;
+  }
+  .intro-overlay.glow-on .intro-glow{ opacity: 1; }
+  .intro-overlay.gather .intro-glow{ opacity: 0; transition-duration: 0.3s; }
   /* 가만히 있어도 아주 천천히 떠다님 */
   .intro-frag-in{
+    position: relative;
     display: flex;
     align-items: center;
     gap: 9px;
@@ -451,6 +501,23 @@
     40%{ scale: 1.45; }
     100%{ scale: 1; }
   }
+  /* 로고 아래 한 줄 - 무슨 사이트인지 처음 온 사람도 감 잡게. 숫자는 문장이 늘면 저절로 바뀜 */
+  .intro-sub{
+    position: absolute;
+    left: 0;
+    right: 0;
+    top: calc(50% + 44px);
+    text-align: center;
+    font-size: 15px;
+    font-weight: 500;
+    letter-spacing: -0.2px;
+    color: var(--text-tertiary);
+    font-variant-numeric: tabular-nums;
+    opacity: 0;
+    transition: opacity 0.8s ease-out 0.25s;
+  }
+  .intro-overlay.ready .intro-sub.has{ opacity: 1; }
+  .intro-overlay.gather .intro-sub.has{ opacity: 0; transition: opacity 0.2s ease-out; }
   .intro-hint{
     position: absolute;
     left: 50%;
@@ -472,6 +539,30 @@
     .intro-frag, .intro-center{ transition-duration: 0.2s; filter: none !important; }
     .intro-overlay.gather .intro-frag{ translate: 0px 0px; scale: 1; transition-duration: 0.2s; }
     .intro-overlay.absorb .intro-center-dot{ animation: none; }
+    .intro-glow{ display: none; }
+    .quote-block.intro-in{ animation: none !important; }
+    body.intro-stage .search-bar, body.intro-reveal .search-bar{ translate: none !important; }
+  }
+  /* 안내 글씨가 바뀔 때(문장 위에 올리면 "누르면 이 문장부터") 살짝 교대 */
+  .intro-hint.swap{ opacity: 0 !important; transition-duration: 0.12s; }
+
+  /* ── 첫 화면 → 메인 화면: 뒤에서 미리 그려 둔 목록이 위에서부터 차르륵 펼쳐짐 ──
+     첫 화면이 떠 있는 동안 목록·검색줄·톱니바퀴는 숨겨 두고(intro-stage), 로고가 날아가기 시작하면
+     문장이 하나씩 올라오고(intro-in), 이어서 검색줄이 아래에서 올라오고, 마지막으로 예시 버튼이 뜸 */
+  body.intro-stage .archive-list > .quote-block{ opacity: 0; }
+  body.intro-stage .search-bar{ opacity: 0; translate: 0 26px; }
+  body.intro-stage .settings-gear-btn{ opacity: 0; }
+  body.intro-reveal .search-bar{
+    transition: opacity 0.6s cubic-bezier(.22,1,.36,1) 0.32s, translate 0.7s cubic-bezier(.22,1,.36,1) 0.32s;
+  }
+  body.intro-reveal .settings-gear-btn{ transition: opacity 0.5s ease-out 0.5s; }
+  .quote-block.intro-in{
+    animation: introListIn 0.75s cubic-bezier(0.2, 0.75, 0.2, 1) both;
+    animation-delay: calc(90ms + var(--i, 0) * 75ms);
+  }
+  @keyframes introListIn{
+    from{ opacity: 0; transform: translateY(24px); }
+    to{ opacity: 1; transform: none; }
   }
 
   /* ── 보관함 (카테고리별 문장 목록) - 메인 화면 ──── */
@@ -1728,6 +1819,93 @@
   body.search-active .quote-block:active{ background: transparent; }
   .search-bar-hint + .compose-send-btn{ margin-left: 0; }
 
+  /* ── 예시 검색 버튼 ─────────────────────────────────────
+     처음 온 사람이 "뭘 쳐야 하지?"에서 멈추지 않게, 검색창이 비어 있을 때만 위에 3개를 띄움.
+     문구는 AI가 문장마다 달아 둔 "이럴 때 꺼내볼 문장"에서 매번 새로 뽑음(진짜 데이터라 누르면 결과가 잘 나옴).
+     앞의 점은 그 문장의 카테고리 색. 글자를 치기 시작하면 사라짐. */
+  .search-chips{
+    position: absolute;
+    left: 0;
+    right: 0;
+    bottom: calc(100% + 10px);
+    display: flex;
+    gap: 8px;
+    padding: 0 6px;
+    pointer-events: none;
+  }
+  /* 버튼 뒤로 목록 글자가 비치지 않게 하얗게 받침 - 위로 갈수록 옅어져서 경계가 안 보임 */
+  .search-chips::before{
+    content: "";
+    position: absolute;
+    left: -8px;
+    right: -8px;
+    top: -18px;
+    bottom: -12px;
+    background: linear-gradient(to bottom, rgba(255,255,255,0), var(--bg) 46%);
+    opacity: 0;
+    transition: opacity 0.18s ease-out;
+  }
+  .search-chips.show::before{ opacity: 1; }
+  .search-chip{
+    position: relative;
+    display: flex;
+    align-items: center;
+    gap: 7px;
+    height: 32px;
+    padding: 0 13px 0 11px;
+    border: 0;
+    border-radius: 999px;
+    background: var(--surface);
+    box-shadow: 0 0 0 1px rgba(0,0,0,0.07), 0 1px 2px -1px rgba(0,0,0,0.06), 0 2px 4px rgba(0,0,0,0.04);
+    font-family: 'Pretendard', sans-serif;
+    font-size: 13.5px;
+    font-weight: 500;
+    letter-spacing: -0.2px;
+    color: var(--text-secondary);
+    white-space: nowrap;
+    cursor: pointer;
+    pointer-events: none;
+    opacity: 0;
+    transform: translateY(6px);
+    transition: opacity 0.14s ease-out, transform 0.14s ease-out, box-shadow 0.15s ease-out, color 0.15s ease-out, scale 0.15s ease-out;
+  }
+  .search-chips.show .search-chip{
+    pointer-events: auto;
+    opacity: 1;
+    transform: translateY(0);
+    transition-duration: 0.32s, 0.32s, 0.15s, 0.15s, 0.15s;
+    transition-timing-function: cubic-bezier(.22,1,.36,1);
+    transition-delay: calc(var(--i, 0) * 60ms), calc(var(--i, 0) * 60ms), 0s, 0s, 0s;
+  }
+  .search-chip:hover{
+    color: var(--text);
+    box-shadow: 0 0 0 1px rgba(0,0,0,0.1), 0 1px 2px -1px rgba(0,0,0,0.08), 0 3px 8px rgba(0,0,0,0.06);
+  }
+  .search-chip:active{ scale: 0.96; }
+  .search-chip-dot{
+    flex-shrink: 0;
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: var(--c, #7FD8F0);
+  }
+  /* 폰 검색 창: 안내 글 아래 줄바꿈되며 가운데 정렬 */
+  .msearch-chips{
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: 8px;
+    margin-top: 14px;
+  }
+  .msearch-chips .search-chip{
+    height: 36px; /* 손가락으로 누르기 쉽게 - 바깥 여백까지 44px 남짓 */
+    opacity: 1;
+    transform: none;
+    pointer-events: auto;
+  }
+  @media (prefers-reduced-motion: reduce){
+    .search-chip{ transform: none !important; }
+  }
   .search-voice{
     position: absolute;
     left: 50%;
@@ -2632,6 +2810,7 @@
 <!-- PC 첫 화면 - 내가 모은 문장 조각들이 떠 있다가, 클릭하거나 아무 키나 누르면
      가운데로 모이며 검색 화면이 열림. 폰에서는 CSS가 감춰 둠(폰은 위의 "입장하기" 화면). -->
 <div class="intro-overlay" id="introOverlay" aria-label="soooo.zip 시작 화면">
+  <div class="intro-glow" id="introGlow"></div>
   <div class="intro-layer d3" data-depth="3"></div>
   <div class="intro-layer d2" data-depth="2"></div>
   <div class="intro-layer d1" data-depth="1"></div>
@@ -2639,6 +2818,7 @@
     <span class="intro-center-dot" id="introCenterDot"></span>
     <span>soooo.zip</span>
   </div>
+  <div class="intro-sub" id="introSub"></div>
   <div class="intro-hint">클릭하거나 아무 키나 눌러 들어가기</div>
 </div>
 
@@ -2781,6 +2961,8 @@
      글자를 치면 맞는 문장이 바로 걸러지고, Enter를 누르면 AI가 한마디와 함께 골라줌. -->
 <div class="compose-bar search-bar" id="searchBar">
   <!-- AI의 한마디 - 입력줄 바로 위에 작게 떠서 "물어본 것에 답하는" 자리에 놓임 -->
+  <!-- 검색창이 비어 있을 때만 뜨는 예시 검색 버튼 -->
+  <div class="search-chips" id="searchChips"></div>
   <div class="search-voice" id="searchVoice" aria-live="polite">
     <span class="search-voice-dot" id="searchVoiceDot"></span>
     <span class="search-voice-text" id="searchVoiceText"></span>
@@ -2981,10 +3163,52 @@ const LOGO_DATA_URI = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAEAAAABACAY
 
 const WORKER_URL = "https://truth-collector-proxy.dingapark1.workers.dev";
 
-// ⚠️ 보안 안내: 아래 SITE_SECRET은 이 HTML 파일 안에 평문으로 들어있습니다.
-// GitHub Pages에 올라간 순간 "누구나 페이지 소스에서 볼 수 있는 값"이 되므로,
-// 엄밀히는 "비밀"이 아니라 "약한 접근 제한 토큰" 정도로 취급해야 합니다.
-const SITE_SECRET = "my-cat-2026";
+// ── 쓰기 열쇠 ───────────────────────────────────────────
+// 예전엔 서버 접속 키와 편집 비밀번호가 이 파일 안에 그대로 들어 있어서, 페이지 소스만 열면
+// 누구나 편집하거나 서버 데이터를 덮어쓸 수 있었음. 이제 비밀번호는 서버(Worker)에만 있고,
+// 맞추면 서버가 7일짜리 "쓰기 열쇠"를 줌. 이 기기는 그 열쇠만 기억함.
+// 보기·검색은 열쇠 없이 누구나(공개), 저장은 열쇠가 있을 때만.
+const WRITE_TOKEN_KEY = 'soooo-write-token';
+function readWriteToken(){
+  try{
+    const t = JSON.parse(localStorage.getItem(WRITE_TOKEN_KEY) || 'null');
+    if(t && t.token && t.exp > Date.now() + 60000) return t.token; // 1분 안에 끝날 열쇠는 이미 끝난 걸로
+  }catch(e){}
+  return '';
+}
+function hasWriteToken(){ return IS_CLAUDE_ARTIFACT || !!readWriteToken(); }
+function saveWriteToken(token, exp){
+  try{ localStorage.setItem(WRITE_TOKEN_KEY, JSON.stringify({ token, exp })); }catch(e){}
+}
+function clearWriteToken(){
+  try{ localStorage.removeItem(WRITE_TOKEN_KEY); }catch(e){}
+}
+function authHeaders(){
+  const t = readWriteToken();
+  return t ? { Authorization: 'Bearer ' + t } : {};
+}
+// 편집 중에 열쇠가 끝났으면(7일이 지남) 비밀번호를 한 번 더 물음 - 쓴 내용은 이 기기에 그대로 있고,
+// 비밀번호를 맞추면 바로 서버로 올라감
+let authPromptShown = false;
+function handleAuthExpired(){
+  clearWriteToken();
+  if(authPromptShown || viewMode !== 'edit') return;
+  authPromptShown = true;
+  showToast('비밀번호를 한 번 더 입력해 주세요. 쓴 건 그대로 있어요', 2600);
+  openPasscodeSheet();
+}
+// 내 사용 기록 한 줄(포트폴리오용 숫자) - 내 기기에서 한 것만, 화면에는 아무것도 안 보임
+function logStat(ev){
+  if(IS_CLAUDE_ARTIFACT || !readWriteToken()) return;
+  try{
+    fetch(WORKER_URL + '/stats', {
+      method: 'POST',
+      headers: Object.assign({ 'Content-Type': 'application/json' }, authHeaders()),
+      body: JSON.stringify(ev),
+      keepalive: true
+    }).catch(() => {});
+  }catch(e){}
+}
 
 const IS_CLAUDE_ARTIFACT = !!window.storage;
 const STORAGE_KEY = 'truth-groups'; // 기존 Worker/KV 키를 그대로 사용 (인프라 변경 없음)
@@ -2995,10 +3219,8 @@ const storageAdapter = {
       try{ return await window.storage.get(key, false); }catch(e){ return null; }
     }
     try{
-      const res = await fetch(WORKER_URL + "/data", {
-        method: "GET",
-        headers: { "X-Site-Secret": SITE_SECRET }
-      });
+      // 읽기는 열쇠 없이 됨(공개 보기)
+      const res = await fetch(WORKER_URL + "/data", { method: "GET" });
       if(!res.ok) return null;
       const value = await res.text();
       return { value };
@@ -3013,9 +3235,10 @@ const storageAdapter = {
     try{
       const res = await fetch(WORKER_URL + "/data", {
         method: "POST",
-        headers: { "Content-Type": "application/json", "X-Site-Secret": SITE_SECRET },
+        headers: Object.assign({ "Content-Type": "application/json" }, authHeaders()),
         body: value
       });
+      if(res.status === 401) handleAuthExpired();
       // fetch()는 서버가 에러(403·500 등)로 응답해도 "실패"로 안 잡음(연결 자체가
       // 끊겼을 때만 실패로 침). 그래서 응답 내용을 직접 확인해야 함 - 이걸 안 하고 있어서
       // 서버가 거부해도 저장에 성공한 것처럼 처리되고 있었음(진짜 원인이었음).
@@ -3912,6 +4135,15 @@ function saveAll(){
   return result;
 }
 async function saveAllInner(){
+  // 열쇠가 없으면 서버에는 안 올림. 보기 화면(방문자, 또는 읽기만 하는 중)이면 이 기기에만 조용히 남기고,
+  // 편집 중인데 열쇠가 끝난 거면 비밀번호를 다시 물으면서 "아직 안 올라감" 상태로 둠(나중에 다시 올림)
+  if(!hasWriteToken()){
+    writeLocalBackup();
+    if(viewMode !== 'edit') return true;
+    handleAuthExpired();
+    markUnsyncedAndRetry();
+    return false;
+  }
   try{
     // 저장 직전에 서버 최신본을 한 번 더 확인해서 병합함 - 안 그러면 내가 저장하는 순간
     // 그 사이 다른 사람이 추가한 내용이 통째로 사라질 수 있음
@@ -4158,6 +4390,7 @@ function handleBackupSave(silent){
   return result;
 }
 async function handleBackupSaveInner(silent){
+  if(!hasWriteToken()) return; // 서버 백업도 열쇠가 있을 때만
   try{
     const res = await storageAdapter.get(STORAGE_KEY);
     const parsed = res && res.value ? JSON.parse(res.value) : null;
@@ -4259,18 +4492,50 @@ function switchToMode(next, skipPageAnim){
 function toggleViewMode(){
   // 편집 모드로 들어갈 때만 비밀번호를 확인함. 나올 때는 그냥 나감.
   if(viewMode === 'view'){
-    openPasscodeSheet();
+    requestEditMode();
   } else {
     switchToMode('view');
   }
 }
 
 // ── 편집 모드 비밀번호 ──────────────────────────────────
-const EDIT_PASSCODE = '134679';
+// 비밀번호 자체는 서버에만 있음 - 여기는 자릿수만 앎
+const PASSCODE_LENGTH = 6;
 let passcodeValue = '';
+let passcodeChecking = false;
+const PASSCODE_ERROR_DEFAULT = '비밀번호가 맞지 않아요';
+// 서버에 비밀번호를 물어봄 → 맞으면 쓰기 열쇠를 받아 기억함
+async function verifyPasscode(code){
+  if(IS_CLAUDE_ARTIFACT) return { ok: true };
+  try{
+    const res = await fetch(WORKER_URL + '/auth', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ passcode: code })
+    });
+    const data = await res.json().catch(() => ({}));
+    if(res.ok && data.token){
+      saveWriteToken(data.token, data.exp);
+      return { ok: true };
+    }
+    if(res.status === 429) return { ok: false, message: '너무 많이 틀렸어요. 1시간 뒤에 다시 해 주세요' };
+    if(res.status === 401) return { ok: false, message: PASSCODE_ERROR_DEFAULT };
+    return { ok: false, message: '지금은 확인이 안 돼요. 잠시 뒤에 다시 해 주세요' };
+  }catch(e){
+    return { ok: false, message: '연결이 안 돼요. 인터넷을 확인해 주세요' };
+  }
+}
+// 편집 화면으로 - 열쇠가 살아 있으면(7일 안에 비밀번호를 쳤으면) 바로, 아니면 비밀번호부터
+function requestEditMode(){
+  if(hasWriteToken()){
+    switchToMode('edit');
+    return;
+  }
+  openPasscodeSheet();
+}
 
 function renderPasscodeDots(){
-  passcodeDots.innerHTML = Array.from({ length: EDIT_PASSCODE.length }, (_, i) => {
+  passcodeDots.innerHTML = Array.from({ length: PASSCODE_LENGTH }, (_, i) => {
     const filled = i < passcodeValue.length;
     const justFilled = i === passcodeValue.length - 1; // 방금 막 채워진 그 점 하나만 표시
     return `<div class="passcode-dot${filled ? ' filled' : ''}${justFilled ? ' just-filled' : ''}"></div>`;
@@ -4281,6 +4546,8 @@ function renderPasscodeDots(){
 
 function openPasscodeSheet(){
   passcodeValue = '';
+  passcodeChecking = false;
+  passcodeError.textContent = PASSCODE_ERROR_DEFAULT;
   passcodeInput.value = '';
   passcodeError.classList.remove('show');
   passcodeOverlay.classList.remove('unlocked');
@@ -4328,14 +4595,23 @@ function cancelPasscodeSheet(){
   if(viewMode === 'view' && !HAS_ONSCREEN_KEYBOARD) focusSoon(() => searchBarInput);
 }
 
-passcodeInput.addEventListener('input', () => {
-  passcodeValue = passcodeInput.value.replace(/\D/g, '').slice(0, EDIT_PASSCODE.length);
+passcodeInput.addEventListener('input', async () => {
+  if(passcodeChecking){ passcodeInput.value = passcodeValue; return; } // 확인하는 동안은 더 못 침
+  passcodeValue = passcodeInput.value.replace(/\D/g, '').slice(0, PASSCODE_LENGTH);
   passcodeInput.value = passcodeValue;
   passcodeError.classList.remove('show');
   renderPasscodeDots();
 
-  if(passcodeValue.length < EDIT_PASSCODE.length) return;
-  if(passcodeValue === EDIT_PASSCODE){
+  if(passcodeValue.length < PASSCODE_LENGTH) return;
+  passcodeChecking = true;
+  const check = await verifyPasscode(passcodeValue);
+  passcodeChecking = false;
+  if(!passcodeOverlay.classList.contains('open')) return; // 확인하는 사이 창을 닫았으면 그대로 둠
+  if(check.ok){
+    authPromptShown = false;
+    // 편집 중에 열쇠가 끝나서 다시 친 경우 - 못 올린 게 있으면 바로 올림
+    if(hasUnsyncedChanges) setTimeout(() => saveAll(), 300);
+    scheduleTagQueue(6000);
     // 바로 닫지 않고, 자물쇠가 열리고 점이 차오르는 걸 잠깐 보여준 뒤 넘어감
     passcodeOverlay.classList.add('unlocked');
     setTimeout(() => {
@@ -4363,6 +4639,7 @@ passcodeInput.addEventListener('input', () => {
     }, 900);
   } else {
     // 틀리면 흔들리고 비워짐
+    passcodeError.textContent = check.message || PASSCODE_ERROR_DEFAULT;
     passcodeError.classList.add('show');
     passcodeDots.classList.remove('shake');
     void passcodeDots.offsetWidth;
@@ -4945,7 +5222,7 @@ wordmark.addEventListener('click', () => {
 });
 settingsGearBtn.addEventListener('click', () => {
   // 보기 화면에서는 비밀번호를 치고 편집 화면으로, 편집 화면에서는 설정 메뉴를 엶
-  if(viewMode === 'view'){ openPasscodeSheet(); return; }
+  if(viewMode === 'view'){ requestEditMode(); return; }
   // 다시 누르면 닫히는 토글 - 이미 열려 있는데 또 열려고 하면 오히려 어색하니
   if(logoMenuPopover.classList.contains('open')) closeLogoMenu();
   else openLogoMenu();
@@ -5064,7 +5341,8 @@ function renderSearchResults(query){
   searchResultsList.classList.remove('waiting');
   const q = query.trim().toLowerCase();
   if(!q){
-    searchResultsList.innerHTML = `<div class="search-empty-hint">궁금한 걸 물어보거나 단어로 찾아보세요</div>`;
+    const ex = pickExampleSearches(3, 16);
+    searchResultsList.innerHTML = `<div class="search-empty-hint">궁금한 걸 물어보거나 단어로 찾아보세요${ex.length ? `<div class="msearch-chips">${ex.map(exampleChipHTML).join('')}</div>` : ''}</div>`;
     return;
   }
   const matches = sentences.filter(s =>
@@ -5077,6 +5355,12 @@ function renderSearchResults(query){
   }
   searchResultsList.innerHTML = matches.map(s => searchItemHTML(s)).join('');
 }
+searchResultsList.addEventListener('click', (e) => {
+  const chip = e.target.closest('.search-chip');
+  if(!chip) return;
+  searchInput.value = chip.dataset.q;
+  askPhoneSearch(chip.dataset.q);
+});
 searchInput.addEventListener('input', () => {
   // 답을 본 뒤 다시 고쳐 쓰기 시작하면 한마디는 내리고 글자 찾기로 돌아감
   if(mSearch.mode !== 'typing'){ mSearch.reqId++; mSearch.mode = 'typing'; mSearchHideVoice(); }
@@ -5094,6 +5378,7 @@ async function askPhoneSearch(query){
   if(HAS_ONSCREEN_KEYBOARD) searchInput.blur();
   const startedAt = Date.now();
   const result = await fetchSearchAnswer(query);
+  logStat({ kind: 'search', q: query, where: HAS_ONSCREEN_KEYBOARD ? 'phone' : 'pc', found: !!(result && !result.weak && result.ids.length) });
   const wait = 250 - (Date.now() - startedAt);
   if(wait > 0) await new Promise(r => setTimeout(r, wait));
   // 그 사이 창을 닫았거나 다른 걸 다시 물었으면 버림
@@ -5102,8 +5387,8 @@ async function askPhoneSearch(query){
   searchActiveIdx = -1;
   if(!result){
     mSearch.mode = 'error';
-    const code = lastAiErrorCode ? ` (${lastAiErrorCode})` : '';
-    mSearchShowVoice('지금은 답을 못 받아왔어요' + code, 'muted');
+    const code = lastAiErrorCode && lastAiErrorCode !== 'limit' ? ` (${lastAiErrorCode})` : '';
+    mSearchShowVoice(lastAiErrorCode === 'limit' ? '오늘 AI 검색을 다 써서 글자로 찾았어요' : '지금은 답을 못 받아왔어요' + code, 'muted');
     renderSearchResults(query); // 글자로 맞는 문장이라도
     return;
   }
@@ -6115,6 +6400,62 @@ function autoGrowSearchInput(){
 
 // AI 한마디 말풍선 - 글자가 바뀔 땐 살짝 사라졌다 나타나며 바뀜(툭 바뀌지 않게)
 let voiceSwapTimer = null;
+// ── 예시 검색 버튼 ───────────────────────────────────────────
+// "이럴 때 꺼내볼 문장"(태그 작업 때 AI가 붙여 둔 상황 한 줄) 중에서 짧은 것을 무작위로 골라 씀.
+// 같은 상황이 여러 문장에 붙어 있으면 한 번만.
+function pickExampleSearches(n, maxLen){
+  const seen = new Set();
+  const pool = [];
+  sentences.forEach(s => {
+    const w = (s.tagWhen || '').replace(/\s+/g, ' ').trim();
+    if(!w || w.length > maxLen || seen.has(w)) return;
+    seen.add(w);
+    pool.push({ text: w, color: getCategoryColor(s.category) });
+  });
+  for(let i = pool.length - 1; i > 0; i--){
+    const j = Math.floor(Math.random() * (i + 1));
+    [pool[i], pool[j]] = [pool[j], pool[i]];
+  }
+  return pool.slice(0, n);
+}
+function exampleChipHTML(item, i){
+  return `<button type="button" class="search-chip" tabindex="-1" style="--c:${item.color};--i:${i}" data-q="${escapeHtml(item.text)}"><span class="search-chip-dot"></span>${escapeHtml(item.text)}</button>`;
+}
+const searchChips = document.getElementById('searchChips');
+let searchChipsFresh = true; // 다음에 보일 때 새로 뽑을지 - 한 번 검색하고 돌아오면 다른 예시가 뜨게
+function updateSearchChips(){
+  if(!searchChips) return;
+  // 첫 화면이 떠 있는 동안엔 안 띄움(닫히면서 띄움)
+  const ov = document.getElementById('introOverlay');
+  const introShowing = !!ov && !ov.classList.contains('gone') && !ov.classList.contains('leave') && getComputedStyle(ov).display !== 'none';
+  const want = document.body.classList.contains('search-active') && searchState.mode === 'idle'
+    && !searchBarInput.value.trim() && !introShowing;
+  if(want && (searchChipsFresh || !searchChips.children.length)){
+    searchChipsFresh = false;
+    searchChips.innerHTML = pickExampleSearches(3, 15).map(exampleChipHTML).join('');
+    // 입력줄 폭을 넘치면 뒤에서부터 뺌(두 줄로 넘어가거나 잘려 보이지 않게)
+    // (scrollWidth는 뒤의 하얀 받침까지 재서 안 맞음 - 버튼 폭을 직접 더함)
+    const max = searchChips.clientWidth - 12;
+    const used = () => [...searchChips.children].reduce((w, c) => w + c.offsetWidth + 8, -8);
+    while(searchChips.children.length > 1 && used() > max) searchChips.lastElementChild.remove();
+  }
+  // 실제로 물어봤다가 돌아오면 새 예시로(글자 몇 개 쳤다 지운 정도로는 안 바꿈 - 자꾸 바뀌면 어수선함)
+  if(!want && searchChips.classList.contains('show') && ['thinking', 'answer', 'nomatch', 'error'].includes(searchState.mode)) searchChipsFresh = true;
+  searchChips.classList.toggle('show', want && searchChips.children.length > 0);
+}
+if(searchChips){
+  searchChips.addEventListener('click', (e) => {
+    const chip = e.target.closest('.search-chip');
+    if(!chip) return;
+    const q = chip.dataset.q;
+    searchBarInput.value = q;
+    autoGrowSearchInput();
+    updateSearchSendState();
+    searchBarInput.focus({ preventScroll: true });
+    askSearchAI(q);
+  });
+}
+
 function showSearchVoice(text, kind, dotColor){
   clearTimeout(voiceSwapTimer);
   const apply = () => {
@@ -6205,6 +6546,7 @@ function exitSearch(animate, keepInput){
   setSearchHint('');
   updateSearchCatPill();
   updateBrowseHint();
+  updateSearchChips();
   if(!wasShowing){
     archiveList.classList.remove('search-waiting', 'search-leaving');
     return;
@@ -6245,6 +6587,7 @@ function resetSearchSilently(skipRender){
   hideSearchVoice();
   setSearchHint('');
   updateSearchCatPill();
+  updateSearchChips();
   archiveList.classList.remove('search-waiting', 'search-leaving');
   if(wasShowing && !skipRender) renderArchive();
 }
@@ -6254,6 +6597,7 @@ function activateSearchBar(){
   autoGrowSearchInput();
   lastComposeReservePx = 0;
   syncComposeBarSpace();
+  updateSearchChips();
   focusSoon(() => searchBarInput);
 }
 
@@ -6265,6 +6609,7 @@ function handleSearchTyping(){
   const q = searchBarInput.value.trim();
   if(!q){
     if(searchState.mode !== 'idle') exitSearch(true);
+    else updateSearchChips();
     return;
   }
   // 답을 받은 뒤 다시 고쳐 쓰기 시작하면 → 다시 "글자로 찾는 중"으로 돌아감
@@ -6274,6 +6619,7 @@ function handleSearchTyping(){
   }
   searchState.mode = 'typing';
   searchState.query = q;
+  updateSearchChips();
   updateSearchCatPill();
   setSearchHint('Enter로 물어보기');
   clearTimeout(localSearchTimer);
@@ -6429,6 +6775,7 @@ async function askSearchAI(query){
   clearTimeout(localSearchTimer);
   searchState.mode = 'thinking';
   searchState.query = query;
+  updateSearchChips();
   updateSearchCatPill();
   setSearchHint('Esc로 돌아가기');
   setListWaiting(true);
@@ -6437,6 +6784,7 @@ async function askSearchAI(query){
   // 찾는 일 자체(기억해둔 답 확인 → AI에게 묻기 → 답 읽기)는 PC·폰이 같은 함수를 씀
   const startedAt = Date.now();
   const result = await fetchSearchAnswer(query);
+  logStat({ kind: 'search', q: query, where: HAS_ONSCREEN_KEYBOARD ? 'phone' : 'pc', found: !!(result && !result.weak && result.ids.length) });
   // 기억해둔 답이 바로 나와도 아주 잠깐 "찾는 중"을 보여주고 펼침(툭 바뀌지 않게)
   const wait = 250 - (Date.now() - startedAt);
   if(wait > 0) await new Promise(r => setTimeout(r, wait));
@@ -6449,10 +6797,13 @@ async function askSearchAI(query){
     // AI가 답을 못 줬을 때 - 글자로 맞는 문장이라도 보여줌. 무슨 문제였는지 짧은 표시를 붙여둠
     // (예: 429=요청이 몰림, 시간 초과 등 - 원인을 알아야 고칠 수 있어서)
     const ids = localSearchIds(query);
-    const code = lastAiErrorCode ? ` (${lastAiErrorCode})` : '';
+    const limited = lastAiErrorCode === 'limit';
+    const code = lastAiErrorCode && !limited ? ` (${lastAiErrorCode})` : '';
     searchState.mode = 'error';
     searchState.ids = ids;
-    showSearchVoice((ids.length ? '답을 못 받아서 글자로 찾았어요' : '지금은 답을 못 받아왔어요') + code, 'muted');
+    showSearchVoice(limited
+      ? (ids.length ? '오늘 AI 검색을 다 써서 글자로 찾았어요' : '오늘 AI 검색을 다 썼어요')
+      : (ids.length ? '답을 못 받아서 글자로 찾았어요' : '지금은 답을 못 받아왔어요') + code, 'muted');
     if(ids.length) renderSearchView(true);
     else {
       archiveList.classList.remove('search-waiting');
@@ -6599,7 +6950,7 @@ ${lines}
   }
   if(reqId !== relatedReqId || !panel.isConnected) return;
   if(ids === null){
-    renderRelatedStatus(panel, '지금은 못 찾아왔어요' + (lastAiErrorCode ? ` (${lastAiErrorCode})` : ''));
+    renderRelatedStatus(panel, lastAiErrorCode === 'limit' ? '오늘 AI 검색을 다 썼어요' : '지금은 못 찾아왔어요' + (lastAiErrorCode ? ` (${lastAiErrorCode})` : ''));
     return;
   }
   writeRelatedCache(target.id, sig, ids);
@@ -6699,7 +7050,7 @@ async function callClaude(purpose, prompt, maxTokens, timeoutMs, extra){
       try{
         res = await fetch(WORKER_URL + '/classify', {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          headers: Object.assign({ 'Content-Type': 'application/json' }, authHeaders()),
           body: JSON.stringify(Object.assign({ model, max_tokens: maxTokens, messages: [{ role: 'user', content: prompt }] }, opts)),
           signal: ctrl.signal
         });
@@ -6718,6 +7069,11 @@ async function callClaude(purpose, prompt, maxTokens, timeoutMs, extra){
         return text;
       }
       const bodyText = await res.text().catch(() => '');
+      // 방문자 하루 AI 횟수를 다 씀 - 다른 모델로 바꿔도 똑같으니 바로 멈춤
+      if(res.status === 429 && /guest_daily_limit/.test(bodyText)){
+        lastAiErrorCode = 'limit';
+        throw new Error('guest_daily_limit');
+      }
       console.warn(`AI 요청 실패 [${purpose}] ${model} → ${res.status}`, bodyText.slice(0, 300));
       lastAiErrorCode = String(res.status);
       lastErr = new Error('요청 실패: ' + res.status + ' ' + bodyText.slice(0, 200));
@@ -6753,7 +7109,7 @@ let tagQueueTimer = null;
 let tagQueueRunning = false;
 let tagFailStreak = 0;
 function scheduleTagQueue(delay){
-  if(HAS_ONSCREEN_KEYBOARD || IS_CLAUDE_ARTIFACT) return;
+  if(HAS_ONSCREEN_KEYBOARD || IS_CLAUDE_ARTIFACT || !hasWriteToken()) return;
   clearTimeout(tagQueueTimer);
   tagQueueTimer = setTimeout(runTagQueue, delay == null ? 4000 : delay);
 }
@@ -6788,7 +7144,7 @@ ${JSON.stringify(payload)}
   return out;
 }
 async function runTagQueue(){
-  if(tagQueueRunning || HAS_ONSCREEN_KEYBOARD) return;
+  if(tagQueueRunning || HAS_ONSCREEN_KEYBOARD || !hasWriteToken()) return;
   tagQueueRunning = true;
   try{
     while(true){
@@ -6822,6 +7178,7 @@ async function runTagQueue(){
         applied++;
       });
       if(applied) await saveAll();
+      if(applied && searchChips && !searchChips.children.length) updateSearchChips(); // 꼬리표가 처음 생겼으면 예시 버튼도
     }
   } finally {
     tagQueueRunning = false;
@@ -8040,20 +8397,29 @@ function buildIntroFragments(){
     const layer = layers.find(l => l.dataset.depth === String(depth));
     const el = document.createElement('div');
     el.className = 'intro-frag';
-    el.innerHTML = '<div class="intro-frag-in"><span class="intro-frag-dot"></span><span></span></div>';
-    el.querySelector('span:last-child').textContent = snip;
+    el.innerHTML = '<div class="intro-frag-in"><span class="intro-frag-dot"></span><span class="intro-frag-text"></span><span class="intro-frag-src"></span></div>';
+    el.querySelector('.intro-frag-text').textContent = snip;
+    el.querySelector('.intro-frag-src').textContent = [s.source, s.ref].filter(x => (x || '').trim()).join(' · ');
+    el.dataset.id = s.id;
     el.style.setProperty('--c', getCategoryColor(s.category));
     el.style.visibility = 'hidden';
     layer.appendChild(el);
     cands.push(el);
   }
   const sizes = cands.map(el => [el.offsetWidth, el.offsetHeight]);
-  // 가운데 워드마크와 아래 안내 글씨 자리는 비워 둠
+  // 로고 아래 한 줄: "11권의 책에서 모은 168개의 문장"
+  const subEl = document.getElementById('introSub');
+  const books = new Set(pool.map(s => (s.source || '').trim()).filter(Boolean)).size;
+  subEl.textContent = books ? `${books}권의 책에서 모은 ${pool.length}개의 문장` : `${pool.length}개의 문장을 모았어요`;
+  subEl.classList.add('has');
+  // 가운데 워드마크·한 줄·아래 안내 글씨 자리는 비워 둠
   const center = document.getElementById('introCenter').getBoundingClientRect();
+  const sub = subEl.getBoundingClientRect();
   const hint = introOverlay.querySelector('.intro-hint').getBoundingClientRect();
   const dot = document.getElementById('introCenterDot').getBoundingClientRect();
   const keepOut = [
     { l: center.left - 70, t: center.top - 60, r: center.right + 70, b: center.bottom + 60 },
+    { l: W / 2 - 200, t: sub.top - 16, r: W / 2 + 200, b: sub.bottom + 28 },
     { l: hint.left - 40, t: hint.top - 30, r: hint.right + 40, b: H }
   ];
   const hit = (a, b) => !(a.r < b.l || a.l > b.r || a.b < b.t || a.t > b.b);
@@ -8091,6 +8457,7 @@ function buildIntroFragments(){
     el.style.top = spot.y + 'px';
     // 들어올 때는 바깥쪽에서 살짝 안으로, 모일 때는 가운데 점으로
     const cx = spot.x + w / 2, cy = spot.y + h / 2;
+    el._cx = cx; el._cy = cy; el._hw = w / 2; // 마우스와의 거리 계산용(매번 재면 느려서 기억해 둠)
     const dx = cx - W / 2, dy = cy - H / 2;
     const len = Math.hypot(dx, dy) || 1;
     el.style.setProperty('--ex', (dx / len * 18).toFixed(1) + 'px');
@@ -8108,6 +8475,8 @@ function buildIntroFragments(){
     inner.style.setProperty('--fdelay', (-Math.random() * 8).toFixed(1) + 's');
     el.style.transitionDelay = (120 + made * 70) + 'ms';
     el.style.visibility = '';
+    // 다 들어온 뒤부터 마우스에 반응(들어오는 중에 반응하면 지연 시간 때문에 굼떠 보임)
+    setTimeout(() => { el.style.transitionDelay = ''; el.classList.add('settled'); }, 120 + made * 70 + 950);
     made++;
   });
   // 다음 프레임에 들어오기 시작(바로 넣으면 시작 상태가 그려지기 전이라 움직임이 안 보임)
@@ -8133,9 +8502,12 @@ function startIntro(){
   introOverlay.focus({ preventScroll: true });
   introReadyTimer = setTimeout(revealIntroCenter, 700);
   setTimeout(() => { introCanLeave = true; }, 250);
-  // 마우스를 따라 겹마다 다른 만큼 살짝 움직임(가까운 겹이 더 많이).
-  // 마우스 이벤트는 1초에 수십~수백 번 오므로, 화면이 한 번 그려질 때마다 한 번만 반영함
+  // 마우스 반응 세 가지 - 화면이 한 번 그려질 때마다 한 번만 계산함(마우스 이벤트는 1초에 수십~수백 번 옴)
+  //  ① 겹마다 다른 만큼 살짝 따라 움직임(가까운 겹이 더 많이) ② 커서 주변 문장이 손전등처럼 밝아짐
+  //  ③ 커서를 따라 옅은 빛이 따라다님
+  document.body.classList.add('intro-stage');
   if(!window.matchMedia('(prefers-reduced-motion: reduce)').matches){
+    const glow = document.getElementById('introGlow');
     let pending = null;
     introOverlay.addEventListener('mousemove', (e) => {
       if(!introOpen) return;
@@ -8144,16 +8516,83 @@ function startIntro(){
       if(!first) return;
       requestAnimationFrame(() => {
         if(!introOpen || !pending){ pending = null; return; }
-        const nx = (pending[0] / window.innerWidth - 0.5) * 2;
-        const ny = (pending[1] / window.innerHeight - 0.5) * 2;
+        const [mx, my] = pending;
         pending = null;
+        const nx = (mx / window.innerWidth - 0.5) * 2;
+        const ny = (my / window.innerHeight - 0.5) * 2;
         introOverlay.querySelectorAll('.intro-layer').forEach(l => {
           const k = { 1: 16, 2: 9, 3: 4 }[l.dataset.depth] || 0;
           l.style.transform = `translate(${(-nx * k).toFixed(1)}px, ${(-ny * k).toFixed(1)}px)`;
         });
+        introOverlay.querySelectorAll('.intro-frag.settled').forEach(f => {
+          // 조각의 가로 길이를 감안해서(긴 문장은 끝에서도 반응하게) 가장 가까운 점까지의 거리
+          const ddx = Math.max(0, Math.abs(mx - f._cx) - f._hw);
+          const d = Math.hypot(ddx, my - f._cy);
+          const near = Math.max(0, Math.min(1, 1 - d / 230));
+          const v = (near * near).toFixed(3); // 가까울수록 더 확 밝아지게
+          if(f._near !== v){ f._near = v; f.style.setProperty('--near', v); }
+        });
+        glow.style.transform = `translate(${mx}px, ${my}px)`;
+        introOverlay.classList.add('glow-on');
       });
     });
+    introOverlay.addEventListener('mouseleave', () => {
+      introOverlay.classList.remove('glow-on');
+      introOverlay.querySelectorAll('.intro-frag.settled').forEach(f => { f._near = '0'; f.style.setProperty('--near', '0'); });
+    });
   }
+  // 문장 바로 위에 올리면: 빛나고 출처가 나오고, 아래 안내가 "누르면 이 문장부터"로 바뀜
+  const hintEl = introOverlay.querySelector('.intro-hint');
+  const HINT_DEFAULT = hintEl.textContent;
+  let litFrag = null;
+  let hintTarget = HINT_DEFAULT;
+  let hintTimer = null;
+  // 문장 사이를 빠르게 지나가도 마지막 상태로 맞게 끝나도록, "바뀔 글씨"를 따로 들고 있다가 한 번만 바꿈
+  const setHint = (text) => {
+    if(hintTarget === text) return;
+    hintTarget = text;
+    hintEl.classList.add('swap');
+    clearTimeout(hintTimer);
+    hintTimer = setTimeout(() => { hintEl.textContent = hintTarget; hintEl.classList.remove('swap'); }, 120);
+  };
+  introOverlay.addEventListener('mouseover', (e) => {
+    if(!introOpen) return;
+    const f = e.target.closest('.intro-frag.settled');
+    if(f === litFrag) return;
+    if(litFrag) litFrag.classList.remove('lit');
+    litFrag = f;
+    const glowEl = document.getElementById('introGlow');
+    if(f){ f.classList.add('lit'); setHint('누르면 이 문장부터 볼 수 있어요'); glowEl.style.setProperty('--gc', f.style.getPropertyValue('--c') || '#7FD8F0'); }
+    else { setHint(HINT_DEFAULT); glowEl.style.removeProperty('--gc'); }
+  });
+}
+
+// 첫 화면이 걷히면서 메인 화면이 펼쳐짐. 문장 조각을 눌러서 들어왔으면 그 문장을 바로 보여줌
+function revealMainAfterIntro(pickId){
+  document.body.classList.add('intro-reveal');
+  document.body.classList.remove('intro-stage');
+  const picked = pickId && findSentence(pickId);
+  if(picked && viewMode === 'view' && document.body.classList.contains('search-active')){
+    searchState.query = '';
+    applySearchResult({ reply: '첫 화면에서 고른 문장이에요', ids: [pickId], weak: false });
+    setSearchHint('Esc로 돌아가기');
+  } else {
+    // 화면에 보이는 문장만 위에서부터 하나씩(안 보이는 아래쪽까지 움직일 필요는 없음)
+    let i = 0;
+    const vh = window.innerHeight;
+    archiveList.querySelectorAll('.quote-block').forEach(el => {
+      if(i >= 10) return;
+      const r = el.getBoundingClientRect();
+      if(r.bottom < 0 || r.top > vh) return;
+      el.style.setProperty('--i', i++);
+      el.classList.add('intro-in');
+    });
+  }
+  setTimeout(updateSearchChips, 750); // 검색줄이 올라온 다음에 예시 버튼
+  setTimeout(() => {
+    document.body.classList.remove('intro-reveal');
+    archiveList.querySelectorAll('.quote-block.intro-in').forEach(el => el.classList.remove('intro-in'));
+  }, 2200);
 }
 
 // 큰 로고가 위쪽 머리글의 작은 로고 자리로 날아가 앉음 - 첫 화면과 앱이 끊기지 않고 이어지게.
@@ -8183,8 +8622,9 @@ function flyIntroLogo(){
   return head;
 }
 
-function leaveIntro(){
+function leaveIntro(pickId){
   if(!introOpen || !introCanLeave) return;
+  if(typeof pickId !== 'string') pickId = null; // 클릭 이벤트 객체가 넘어오는 경우 등
   introOpen = false;
   clearTimeout(introReadyTimer);
   const reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
@@ -8200,6 +8640,7 @@ function leaveIntro(){
     introOverlay.classList.add('leave', head ? 'flying' : 'fading');
     // 배경이 걷히는 순간부터 바로 칠 수 있게 커서를 검색창으로
     if(viewMode === 'view' && document.body.classList.contains('search-active')) searchBarInput.focus({ preventScroll: true });
+    revealMainAfterIntro(pickId);
     const done = head ? 580 : (reduce ? 220 : 420);
     // 다 내려앉은 순간 같은 프레임에 진짜 머리글 로고로 바꿔 끼움 - 크기·위치가 딱 겹치게 맞춰 둬서
     // 바뀌는 순간이 안 보임(미리 겹쳐 보이게 하면 아직 날아오는 중이라 로고가 두 겹으로 보였음)
@@ -8213,7 +8654,10 @@ function leaveIntro(){
 }
 
 if(introOverlay){
-  introOverlay.addEventListener('click', leaveIntro);
+  introOverlay.addEventListener('click', (e) => {
+    const f = e.target.closest('.intro-frag');
+    leaveIntro(f ? f.dataset.id : null);
+  });
   // 첫 화면이 떠 있는 동안 누른 키는 검색창이나 단축키로 새지 않게 여기서 막고 들어가기만 함.
   // (Cmd/Ctrl/Alt를 같이 누른 건 새로고침 같은 브라우저 동작이라 건드리지 않음)
   window.addEventListener('keydown', (e) => {
