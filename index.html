@@ -116,6 +116,13 @@
     animation: splashSweepOut 0.6s cubic-bezier(.22,1,.36,1) forwards;
     pointer-events: none;
   }
+  /* 아이폰 사파리는 아래 주소창(떠 있는 도구막대) 뒤에도 페이지를 그리는데, 첫 화면은 "보이는 높이(dvh)"까지만
+     덮어서 그 틈으로 뒤의 문장 목록이 비쳐 보였음 → "화면에 꽉 안 찬" 것처럼 보이던 진짜 원인.
+     첫 화면이 떠 있는 동안은 뒤의 앱 화면 자체를 숨겨서, 주소창 뒤로는 첫 화면 아래쪽과 같은 흰 배경만 보이게 함.
+     (입장하기를 누르는 순간 다시 보이게 해서, 첫 화면이 걷히는 동안 그 뒤로 앱이 드러남) */
+  @media (pointer: coarse){
+    html:not(.splash-done) body > :not(.splash-overlay):not(script):not(style){ visibility: hidden; }
+  }
   /* 이미지 로고 대신 헤더와 같은 워드마크 스타일 - "처음 켜는 순간"부터 일관된 인상을 줌 */
   .splash-wordmark{
     display: flex;
@@ -3166,7 +3173,7 @@ const WORKER_URL = "https://truth-collector-proxy.dingapark1.workers.dev";
 // ── 쓰기 열쇠 ───────────────────────────────────────────
 // 예전엔 서버 접속 키와 편집 비밀번호가 이 파일 안에 그대로 들어 있어서, 페이지 소스만 열면
 // 누구나 편집하거나 서버 데이터를 덮어쓸 수 있었음. 이제 비밀번호는 서버(Worker)에만 있고,
-// 맞추면 서버가 7일짜리 "쓰기 열쇠"를 줌. 이 기기는 그 열쇠만 기억함.
+// 맞추면 서버가 30일짜리 "쓰기 열쇠"를 줌. 이 기기는 그 열쇠만 기억함.
 // 보기·검색은 열쇠 없이 누구나(공개), 저장은 열쇠가 있을 때만.
 const WRITE_TOKEN_KEY = 'soooo-write-token';
 function readWriteToken(){
@@ -3187,7 +3194,7 @@ function authHeaders(){
   const t = readWriteToken();
   return t ? { Authorization: 'Bearer ' + t } : {};
 }
-// 편집 중에 열쇠가 끝났으면(7일이 지남) 비밀번호를 한 번 더 물음 - 쓴 내용은 이 기기에 그대로 있고,
+// 편집 중에 열쇠가 끝났으면(30일이 지남) 비밀번호를 한 번 더 물음 - 쓴 내용은 이 기기에 그대로 있고,
 // 비밀번호를 맞추면 바로 서버로 올라감
 let authPromptShown = false;
 function handleAuthExpired(){
@@ -4525,7 +4532,7 @@ async function verifyPasscode(code){
     return { ok: false, message: '연결이 안 돼요. 인터넷을 확인해 주세요' };
   }
 }
-// 편집 화면으로 - 열쇠가 살아 있으면(7일 안에 비밀번호를 쳤으면) 바로, 아니면 비밀번호부터
+// 편집 화면으로 - 열쇠가 살아 있으면(30일 안에 비밀번호를 쳤으면) 바로, 아니면 비밀번호부터
 function requestEditMode(){
   if(hasWriteToken()){
     switchToMode('edit');
@@ -5341,7 +5348,7 @@ function renderSearchResults(query){
   searchResultsList.classList.remove('waiting');
   const q = query.trim().toLowerCase();
   if(!q){
-    const ex = pickExampleSearches(3, 16);
+    const ex = pickExampleSearches(3, 24);
     searchResultsList.innerHTML = `<div class="search-empty-hint">궁금한 걸 물어보거나 단어로 찾아보세요${ex.length ? `<div class="msearch-chips">${ex.map(exampleChipHTML).join('')}</div>` : ''}</div>`;
     return;
   }
@@ -6404,14 +6411,27 @@ let voiceSwapTimer = null;
 // "이럴 때 꺼내볼 문장"(태그 작업 때 AI가 붙여 둔 상황 한 줄) 중에서 짧은 것을 무작위로 골라 씀.
 // 같은 상황이 여러 문장에 붙어 있으면 한 번만.
 function pickExampleSearches(n, maxLen){
+  // 예전엔 "15자 이하"처럼 글자 수로 잘랐는데, 실제 꼬리표는 더 긴 게 많아서 PC에선 하나도 안 남는 일이 있었음.
+  // 이제는 짧은 순으로 줄 세운 뒤 앞쪽 무리(짧은 편) 안에서 무작위로 고름 - 길이 제한은 아주 긴 것만 거름
   const seen = new Set();
-  const pool = [];
+  let pool = [];
   sentences.forEach(s => {
     const w = (s.tagWhen || '').replace(/\s+/g, ' ').trim();
-    if(!w || w.length > maxLen || seen.has(w)) return;
+    if(!w || w.length > (maxLen || 24) || seen.has(w)) return;
     seen.add(w);
     pool.push({ text: w, color: getCategoryColor(s.category) });
   });
+  // "이럴 때" 꼬리표가 하나도 없으면(아직 태그 전) 키워드로 대신
+  if(!pool.length){
+    sentences.forEach(s => (Array.isArray(s.tags) ? s.tags : []).forEach(t => {
+      const w = String(t || '').trim();
+      if(!w || w.length > 12 || seen.has(w)) return;
+      seen.add(w);
+      pool.push({ text: w, color: getCategoryColor(s.category) });
+    }));
+  }
+  pool.sort((a, b) => a.text.length - b.text.length);
+  pool = pool.slice(0, Math.max(n * 3, Math.ceil(pool.length * 0.45)));
   for(let i = pool.length - 1; i > 0; i--){
     const j = Math.floor(Math.random() * (i + 1));
     [pool[i], pool[j]] = [pool[j], pool[i]];
@@ -6432,18 +6452,19 @@ function updateSearchChips(){
     && !searchBarInput.value.trim() && !introShowing;
   if(want && (searchChipsFresh || !searchChips.children.length)){
     searchChipsFresh = false;
-    searchChips.innerHTML = pickExampleSearches(3, 15).map(exampleChipHTML).join('');
+    searchChips.innerHTML = pickExampleSearches(3, 22).map(exampleChipHTML).join('');
     // 입력줄 폭을 넘치면 뒤에서부터 뺌(두 줄로 넘어가거나 잘려 보이지 않게)
     // (scrollWidth는 뒤의 하얀 받침까지 재서 안 맞음 - 버튼 폭을 직접 더함)
     const max = searchChips.clientWidth - 12;
     const used = () => [...searchChips.children].reduce((w, c) => w + c.offsetWidth + 8, -8);
-    while(searchChips.children.length > 1 && used() > max) searchChips.lastElementChild.remove();
+    if(max > 100) while(searchChips.children.length > 1 && used() > max) searchChips.lastElementChild.remove();
   }
   // 실제로 물어봤다가 돌아오면 새 예시로(글자 몇 개 쳤다 지운 정도로는 안 바꿈 - 자꾸 바뀌면 어수선함)
   if(!want && searchChips.classList.contains('show') && ['thinking', 'answer', 'nomatch', 'error'].includes(searchState.mode)) searchChipsFresh = true;
   searchChips.classList.toggle('show', want && searchChips.children.length > 0);
 }
 if(searchChips){
+  searchBarInput.addEventListener('focus', () => updateSearchChips());
   searchChips.addEventListener('click', (e) => {
     const chip = e.target.closest('.search-chip');
     if(!chip) return;
@@ -8166,6 +8187,7 @@ let splashDismissed = false;
 function dismissSplash(){
   if(splashDismissed) return;
   splashDismissed = true;
+  document.documentElement.classList.add('splash-done'); // 뒤에 숨겨 둔 앱 화면을 다시 보이게
   splashOverlay.classList.add('hide');
 }
 
