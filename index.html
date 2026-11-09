@@ -121,7 +121,35 @@
      첫 화면이 떠 있는 동안은 뒤의 앱 화면 자체를 숨겨서, 주소창 뒤로는 첫 화면 아래쪽과 같은 흰 배경만 보이게 함.
      (입장하기를 누르는 순간 다시 보이게 해서, 첫 화면이 걷히는 동안 그 뒤로 앱이 드러남) */
   @media (pointer: coarse){
-    html:not(.splash-done) body > :not(.splash-overlay):not(script):not(style){ visibility: hidden; }
+    html:not(.splash-done) body > :not(.splash-overlay):not(.intro-overlay):not(script):not(style){ visibility: hidden; }
+  }
+  /* 입장하기를 누르면: 색 번짐·글자·버튼은 옅어지며 사라지고, 로고는 본 화면 맨 위 로고 자리로 날아가 앉음.
+     그동안 본 화면은 문장이 위에서부터 하나씩 올라오고, 아래 카테고리·검색 버튼이 톡 올라옴
+     (PC 첫 화면이 걷힐 때와 같은 흐름 - 예전엔 화면이 통째로 위로 밀려 사라져서 껍데기만 벗겨지는 느낌이었음) */
+  .splash-overlay.leaving{
+    background-color: transparent;
+    pointer-events: none;
+    transition: background-color 0.45s ease-out;
+  }
+  .splash-overlay.leaving .splash-bg,
+  .splash-overlay.leaving .splash-fade{ opacity: 0; transition: opacity 0.45s ease-out; }
+  .splash-overlay.leaving .splash-content{ opacity: 0; translate: 0 14px; transition: opacity 0.22s ease-out, translate 0.3s ease-out; }
+  .splash-overlay.leaving .splash-wordmark{
+    animation: none;
+    transform-origin: 0 50%;
+    transition: transform 0.56s cubic-bezier(.65,0,.25,1);
+  }
+  .splash-overlay.leaving .splash-wordmark-dot{ transition: background-color 0.56s ease; }
+  .splash-overlay.gone{ display: none !important; }
+  body.splash-reveal .category-tabs{ animation: popUpIn 0.55s cubic-bezier(.22,1,.36,1) 0.34s both; }
+  body.splash-reveal .add-quote-trigger-btn{ animation: popUpIn 0.55s cubic-bezier(.22,1,.36,1) 0.42s both; }
+  @keyframes popUpIn{
+    from{ opacity: 0; translate: 0 18px; }
+    to{ opacity: 1; translate: 0 0; }
+  }
+  @media (prefers-reduced-motion: reduce){
+    body.splash-reveal .category-tabs, body.splash-reveal .add-quote-trigger-btn{ animation: none; }
+    .splash-overlay.leaving .splash-wordmark{ transition: none; }
   }
   /* 이미지 로고 대신 헤더와 같은 워드마크 스타일 - "처음 켜는 순간"부터 일관된 인상을 줌 */
   .splash-wordmark{
@@ -346,6 +374,24 @@
   }
   @media not all and (pointer: coarse){
     .intro-overlay{ display: block; }
+  }
+  /* 폰도 이제 같은 "흩어진 문장" 첫 화면(B안 시험 중). 예전 색 번짐 시작 화면은 숨겨 둠(코드는 남겨 둠 - 되돌리기 쉽게) */
+  @media (pointer: coarse){
+    .intro-overlay{ display: block; cursor: default; }
+    .splash-overlay{ display: none !important; }
+    /* 머리글 로고(17px·700·간격 7px·점 8px)를 그대로 키운 비율 - 날아가 앉을 때 딱 겹치게 */
+    .intro-center{ font-size: 38px; gap: 15.6px; letter-spacing: -0.42px; }
+    .intro-center-dot{ width: 17.9px; height: 17.9px; transform: translateY(1px); }
+    .intro-sub{ top: calc(50% + 32px); font-size: 13.5px; }
+    .intro-hint{ bottom: max(44px, calc(env(safe-area-inset-bottom) + 28px)); font-size: 13px; }
+    .intro-layer.d1 .intro-frag{ font-size: 16px; }
+    .intro-layer.d2 .intro-frag{ font-size: 14px; }
+    .intro-layer.d3 .intro-frag{ font-size: 12.5px; }
+    .intro-frag{ gap: 8px; }
+    .intro-frag-dot{ width: 6px; height: 6px; }
+    .intro-frag-src{ left: 14px; font-size: 11px; }
+    /* 첫 화면 동안 아래 카테고리·검색 버튼도 숨겨 뒀다가, 걷힐 때 톡 올라옴 */
+    body.intro-stage .category-tabs, body.intro-stage .add-quote-trigger-btn{ opacity: 0; }
   }
   .intro-overlay:focus{ outline: none; }
   /* 닫힐 때: 흰 배경만 걷히고(뒤의 앱이 드러남), 로고는 머리글 자리로 날아가 앉음.
@@ -1836,6 +1882,7 @@
     right: 0;
     bottom: calc(100% + 10px);
     display: flex;
+    justify-content: center; /* 입력줄 위 가운데, 좌우 여백 똑같이 */
     gap: 8px;
     padding: 0 6px;
     pointer-events: none;
@@ -1889,12 +1936,12 @@
     box-shadow: 0 0 0 1px rgba(0,0,0,0.1), 0 1px 2px -1px rgba(0,0,0,0.08), 0 3px 8px rgba(0,0,0,0.06);
   }
   .search-chip:active{ scale: 0.96; }
-  .search-chip-dot{
+  /* AI가 골라 준 추천이라는 표시 - 동그라미 대신 반짝이 */
+  .search-chip-spark{
     flex-shrink: 0;
-    width: 6px;
-    height: 6px;
-    border-radius: 50%;
-    background: var(--c, #7FD8F0);
+    font-size: 12.5px;
+    line-height: 1;
+    margin-left: -1px;
   }
   /* 폰 검색 창: 안내 글 아래 줄바꿈되며 가운데 정렬 */
   .msearch-chips{
@@ -3148,8 +3195,11 @@
 // 컴퓨터는 "쓰러 들어오는" 자리라 매번 거쳐 가면 번거로움. 폰은 읽으러 여는 자리라
 // 그대로 둠. 여기서 미리 감추는 이유는, 잠깐이라도 보였다 사라지면 깜빡여 보이기 때문.
 const SKIP_SPLASH = !window.matchMedia('(pointer: coarse)').matches;
+// 폰 첫 화면 방식: 'scatter' = PC와 같은 흩어진 문장(B안), 'splash' = 예전 색 번짐 화면
+const PHONE_INTRO_STYLE = 'scatter';
+const USE_SCATTER_INTRO = SKIP_SPLASH || PHONE_INTRO_STYLE === 'scatter';
 (function hideSplashOnDesktop(){
-  if(!SKIP_SPLASH) return;
+  if(!USE_SCATTER_INTRO) return;
   const el = document.getElementById('splashOverlay');
   if(el) el.style.display = 'none';
 })();
@@ -6439,7 +6489,7 @@ function pickExampleSearches(n, maxLen){
   return pool.slice(0, n);
 }
 function exampleChipHTML(item, i){
-  return `<button type="button" class="search-chip" tabindex="-1" style="--c:${item.color};--i:${i}" data-q="${escapeHtml(item.text)}"><span class="search-chip-dot"></span>${escapeHtml(item.text)}</button>`;
+  return `<button type="button" class="search-chip" tabindex="-1" style="--c:${item.color};--i:${i}" data-q="${escapeHtml(item.text)}"><span class="search-chip-spark" aria-hidden="true">✨</span>${escapeHtml(item.text)}</button>`;
 }
 const searchChips = document.getElementById('searchChips');
 let searchChipsFresh = true; // 다음에 보일 때 새로 뽑을지 - 한 번 검색하고 돌아오면 다른 예시가 뜨게
@@ -8188,7 +8238,55 @@ function dismissSplash(){
   if(splashDismissed) return;
   splashDismissed = true;
   document.documentElement.classList.add('splash-done'); // 뒤에 숨겨 둔 앱 화면을 다시 보이게
-  splashOverlay.classList.add('hide');
+  const reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  // 로고가 본 화면 맨 위 로고 자리로 날아가 앉게(크기·위치를 재서 그만큼만 옮기고 줄임)
+  const sw = splashOverlay.querySelector('.splash-wordmark');
+  const sDot = sw && sw.querySelector('.splash-wordmark-dot');
+  const sText = sw && sw.lastElementChild;
+  const head = document.getElementById('wordmark');
+  const hDot = head && head.querySelector('.wordmark-dot');
+  const hText = head && head.querySelector('.wordmark-text');
+  let flying = false;
+  if(!reduce && sw && sDot && sText && hDot && hText){
+    const a = hDot.getBoundingClientRect(), b = hText.getBoundingClientRect();
+    const swr = sw.getBoundingClientRect();
+    const iLeft = swr.left + sDot.offsetLeft, iRight = swr.left + sText.offsetLeft + sText.offsetWidth;
+    const iMidY = swr.top + sText.offsetTop + sText.offsetHeight / 2;
+    if(a.width && b.width && iRight > iLeft){
+      const k = (b.right - a.left) / (iRight - iLeft);
+      // 기준점이 왼쪽(transform-origin: 0 50%)이라, 점의 왼쪽 끝을 머리글 점의 왼쪽 끝에 맞춤
+      // 줄어드는 기준점은 워드마크 상자의 왼쪽·세로 가운데 - 그 기준으로 줄어든 뒤의 자리를 계산해서 옮김
+      const originX = swr.left, originY = swr.top + swr.height / 2;
+      const tx = a.left - (originX + (iLeft - originX) * k);
+      const ty = (b.top + b.height / 2) - (originY + (iMidY - originY) * k);
+      head.style.opacity = '0';
+      sDot.style.backgroundColor = getComputedStyle(hDot).backgroundColor;
+      requestAnimationFrame(() => { sw.style.transform = `translate(${tx.toFixed(1)}px, ${ty.toFixed(1)}px) scale(${k.toFixed(4)})`; });
+      flying = true;
+    }
+  }
+  splashOverlay.classList.add('leaving');
+  document.body.classList.add('splash-reveal');
+  // 화면에 보이는 문장만 위에서부터 하나씩 올라옴
+  if(!reduce){
+    let i = 0;
+    const vh = window.innerHeight;
+    document.querySelectorAll('#archiveList .quote-block').forEach(el => {
+      if(i >= 8) return;
+      const r = el.getBoundingClientRect();
+      if(r.bottom < 0 || r.top > vh) return;
+      el.style.setProperty('--i', i++);
+      el.classList.add('intro-in');
+    });
+  }
+  setTimeout(() => {
+    if(head) head.style.opacity = '';
+    splashOverlay.classList.add('gone');
+  }, flying ? 600 : (reduce ? 200 : 460));
+  setTimeout(() => {
+    document.body.classList.remove('splash-reveal');
+    document.querySelectorAll('#archiveList .quote-block.intro-in').forEach(el => el.classList.remove('intro-in'));
+  }, 1700);
 }
 
 // 배경 색 덩어리들의 자리·크기를 그날에 맞게 정함 - 매일 조금씩 다른 그림이 되어서,
@@ -8364,7 +8462,8 @@ function pickSplashSub(quoteCount){
 // 문장 조각을 화면 곳곳에 흩뿌려 두고, 클릭이나 아무 키를 누르면 가운데 점으로 모으며 닫음.
 // 조각은 들어올 때마다 무작위로 다시 뽑아서, 열 때마다 다른 문장들이 떠 있음.
 const introOverlay = document.getElementById('introOverlay');
-let introOpen = SKIP_SPLASH && !!introOverlay;
+let introOpen = USE_SCATTER_INTRO && !!introOverlay;
+const INTRO_TOUCH = !SKIP_SPLASH; // 폰(손가락) - 마우스 반응 대신 누르기·저절로 반짝이기
 let introCanLeave = false;
 let introBusy = introOpen; // 닫히는 움직임이 끝날 때까지 true - 그동안 무거운 뒷일(태그 작업)은 쉼
 
@@ -8383,13 +8482,15 @@ function introSnippet(s){
   };
   const text = clean(s.text);
   if(!text) return '';
-  const hs = (s.highlights || []).map(h => clean(text.slice(h.start, h.end))).filter(h => h.length >= 6 && h.length <= 26);
+  // 폰은 화면이 좁아서 조각을 더 짧게
+  const MAX = INTRO_TOUCH ? 17 : 24;
+  const hs = (s.highlights || []).map(h => clean(text.slice(h.start, h.end))).filter(h => h.length >= 6 && h.length <= MAX + 2);
   if(hs.length) return hs[0];
   const first = text.split(/(?<=[.!?…])\s/)[0];
-  if(first.length <= 24) return clean(first);
-  let cut = first.slice(0, 22);
+  if(first.length <= MAX) return clean(first);
+  let cut = first.slice(0, MAX - 2);
   const sp = cut.lastIndexOf(' ');
-  if(sp >= 10) cut = cut.slice(0, sp);
+  if(sp >= (INTRO_TOUCH ? 7 : 10)) cut = cut.slice(0, sp);
   return clean(cut.replace(/[,.\s]+$/, '')) + '…';
 }
 
@@ -8406,7 +8507,7 @@ function buildIntroFragments(){
     [picks[i], picks[j]] = [picks[j], picks[i]];
   }
   const W = window.innerWidth, H = window.innerHeight;
-  const want = Math.max(8, Math.min(16, Math.round(W * H / 70000)));
+  const want = INTRO_TOUCH ? 9 : Math.max(8, Math.min(16, Math.round(W * H / 70000)));
 
   // 1) 후보 조각을 한꺼번에 만들어 넣고(아직 안 보이게) → 2) 크기를 한 번에 잼 → 3) 자리 배치.
   //    하나 넣고 재고, 또 넣고 재고 하면 그때마다 화면 계산을 새로 해서 첫 순간이 버벅였음.
@@ -8439,14 +8540,16 @@ function buildIntroFragments(){
   const sub = subEl.getBoundingClientRect();
   const hint = introOverlay.querySelector('.intro-hint').getBoundingClientRect();
   const dot = document.getElementById('introCenterDot').getBoundingClientRect();
+  // 폰은 화면이 좁아서 여백·간격을 줄이고, 칸도 가로 2 × 세로 8로 나눔
+  const EDGE = INTRO_TOUCH ? 18 : 40, PADX = INTRO_TOUCH ? 10 : 24, PADY = INTRO_TOUCH ? 12 : 18;
   const keepOut = [
-    { l: center.left - 70, t: center.top - 60, r: center.right + 70, b: center.bottom + 60 },
-    { l: W / 2 - 200, t: sub.top - 16, r: W / 2 + 200, b: sub.bottom + 28 },
+    { l: center.left - (INTRO_TOUCH ? 16 : 70), t: center.top - (INTRO_TOUCH ? 36 : 60), r: center.right + (INTRO_TOUCH ? 16 : 70), b: center.bottom + (INTRO_TOUCH ? 30 : 60) },
+    { l: W / 2 - 200, t: sub.top - 12, r: W / 2 + 200, b: sub.bottom + (INTRO_TOUCH ? 22 : 28) },
     { l: hint.left - 40, t: hint.top - 30, r: hint.right + 40, b: H }
   ];
   const hit = (a, b) => !(a.r < b.l || a.l > b.r || a.b < b.t || a.t > b.b);
   // 완전 무작위면 한쪽에 몰리고 한쪽이 텅 비어서, 화면을 칸으로 나눠 칸을 섞어 가며 하나씩 채움
-  const COLS = 4, ROWS = 6;
+  const COLS = INTRO_TOUCH ? 2 : 4, ROWS = INTRO_TOUCH ? 8 : 6;
   const cells = [];
   for(let r = 0; r < ROWS; r++) for(let c = 0; c < COLS; c++) cells.push({ c, r });
   for(let i = cells.length - 1; i > 0; i--){
@@ -8465,10 +8568,11 @@ function buildIntroFragments(){
       // 처음 몇 번은 지금 칸 안에서, 안 되면 다음 칸으로 넘어가며 찾음
       if(tries % 5 === 0 && tries) cellIdx++;
       const cell = cells[cellIdx % cells.length];
-      const cw = (W - 80) / COLS, ch = (H - 80) / ROWS;
-      const x = Math.min(W - 40 - w, Math.max(40, 40 + cell.c * cw + Math.random() * cw - w / 2));
-      const y = Math.min(H - 40 - h, Math.max(40, 40 + cell.r * ch + Math.random() * ch - h / 2));
-      const box = { l: x - 24, t: y - 18, r: x + w + 24, b: y + h + 18 };
+      const cw = (W - EDGE * 2) / COLS, ch = (H - EDGE * 2 - (INTRO_TOUCH ? 40 : 0)) / ROWS;
+      const top0 = EDGE + (INTRO_TOUCH ? 40 : 0); // 폰은 상태바 아래부터
+      const x = Math.min(W - EDGE - w, Math.max(EDGE, EDGE + cell.c * cw + Math.random() * cw - w / 2));
+      const y = Math.min(H - EDGE - h, Math.max(top0, top0 + cell.r * ch + Math.random() * ch - h / 2));
+      const box = { l: x - PADX, t: y - PADY, r: x + w + PADX, b: y + h + PADY };
       if(keepOut.some(z => hit(box, z)) || placed.some(p => hit(box, p))) continue;
       spot = { x, y, box };
     }
@@ -8520,6 +8624,7 @@ function revealIntroCenter(){
 
 function startIntro(){
   if(!introOpen){ if(introOverlay) introOverlay.classList.add('gone'); return; }
+  if(INTRO_TOUCH) introOverlay.querySelector('.intro-hint').textContent = '화면을 눌러 들어가기';
   if(document.activeElement && document.activeElement.blur) document.activeElement.blur();
   introOverlay.focus({ preventScroll: true });
   introReadyTimer = setTimeout(revealIntroCenter, 700);
@@ -8578,7 +8683,7 @@ function startIntro(){
     hintTimer = setTimeout(() => { hintEl.textContent = hintTarget; hintEl.classList.remove('swap'); }, 120);
   };
   introOverlay.addEventListener('mouseover', (e) => {
-    if(!introOpen) return;
+    if(!introOpen || INTRO_TOUCH) return; // 폰은 누를 때 따로 처리(손가락 탭도 mouseover를 일으켜서 막음)
     const f = e.target.closest('.intro-frag.settled');
     if(f === litFrag) return;
     if(litFrag) litFrag.classList.remove('lit');
@@ -8589,8 +8694,38 @@ function startIntro(){
   });
 }
 
+// 폰: 마우스가 없으니 ① 문장을 누르면 빛나고 출처가 보이고 ② 가만히 있어도 문장이 하나씩 저절로 반짝임
+function introTouchTap(frag){
+  const prev = introOverlay.querySelector('.intro-frag.lit');
+  if(frag && frag === prev) return false; // 이미 빛나는 걸 한 번 더 누르면 → 들어가기
+  if(prev) prev.classList.remove('lit');
+  if(!frag) return false;                 // 빈 곳 → 들어가기
+  frag.classList.add('lit');
+  const hintEl = introOverlay.querySelector('.intro-hint');
+  hintEl.classList.add('swap');
+  setTimeout(() => { hintEl.textContent = '한 번 더 누르거나 빈 곳을 누르면 들어가요'; hintEl.classList.remove('swap'); }, 120);
+  return true;                            // 빛나게만 하고 머무름
+}
+let introTwinkleTimer = null;
+function startIntroTwinkle(){
+  if(!INTRO_TOUCH || window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+  const tick = () => {
+    if(!introOpen) return;
+    const frags = [...introOverlay.querySelectorAll('.intro-frag.settled:not(.lit)')];
+    if(frags.length){
+      const f = frags[Math.floor(Math.random() * frags.length)];
+      f.style.setProperty('--near', '0.85');
+      setTimeout(() => f.style.setProperty('--near', '0'), 1400);
+    }
+    introTwinkleTimer = setTimeout(tick, 1700 + Math.random() * 900);
+  };
+  introTwinkleTimer = setTimeout(tick, 2200);
+}
+
 // 첫 화면이 걷히면서 메인 화면이 펼쳐짐. 문장 조각을 눌러서 들어왔으면 그 문장을 바로 보여줌
 function revealMainAfterIntro(pickId){
+  document.documentElement.classList.add('splash-done'); // 폰: 첫 화면 동안 숨겨 둔 앱 화면을 다시 보이게
+  if(INTRO_TOUCH) document.body.classList.add('splash-reveal'); // 폰: 카테고리·검색 버튼이 톡 올라옴
   document.body.classList.add('intro-reveal');
   document.body.classList.remove('intro-stage');
   const picked = pickId && findSentence(pickId);
@@ -8612,7 +8747,7 @@ function revealMainAfterIntro(pickId){
   }
   setTimeout(updateSearchChips, 750); // 검색줄이 올라온 다음에 예시 버튼
   setTimeout(() => {
-    document.body.classList.remove('intro-reveal');
+    document.body.classList.remove('intro-reveal', 'splash-reveal');
     archiveList.querySelectorAll('.quote-block.intro-in').forEach(el => el.classList.remove('intro-in'));
   }, 2200);
 }
@@ -8678,6 +8813,11 @@ function leaveIntro(pickId){
 if(introOverlay){
   introOverlay.addEventListener('click', (e) => {
     const f = e.target.closest('.intro-frag');
+    if(INTRO_TOUCH){
+      if(introCanLeave && introTouchTap(f && f.classList.contains('settled') ? f : null)) return;
+      leaveIntro(null);
+      return;
+    }
     leaveIntro(f ? f.dataset.id : null);
   });
   // 첫 화면이 떠 있는 동안 누른 키는 검색창이나 단축키로 새지 않게 여기서 막고 들어가기만 함.
@@ -8709,10 +8849,11 @@ if(introOverlay){
   });
 }
 startIntro();
+startIntroTwinkle();
 
 loadAll().then(() => {
   // PC는 시작 화면을 건너뛰므로, 숫자 세기·배경 만들기 같은 준비도 할 필요가 없음
-  if(SKIP_SPLASH){
+  if(USE_SCATTER_INTRO){
     splashDismissed = true;
     // 웹폰트(Pretendard)가 늦게 오면 글자 폭이 바뀌어 조각끼리 겹칠 수 있어서, 폰트가 준비된 뒤에 잼(최대 0.8초만 기다림)
     const fontsReady = document.fonts && document.fonts.ready ? Promise.race([document.fonts.ready, new Promise(r => setTimeout(r, 800))]) : Promise.resolve();
