@@ -121,7 +121,7 @@
      첫 화면이 떠 있는 동안은 뒤의 앱 화면 자체를 숨겨서, 주소창 뒤로는 첫 화면 아래쪽과 같은 흰 배경만 보이게 함.
      (입장하기를 누르는 순간 다시 보이게 해서, 첫 화면이 걷히는 동안 그 뒤로 앱이 드러남) */
   @media (pointer: coarse){
-    html:not(.splash-done) body > :not(.splash-overlay):not(.intro-overlay):not(script):not(style){ visibility: hidden; }
+    html:not(.splash-done) body > :not(.splash-overlay):not(.intro-overlay):not(.pintro):not(script):not(style){ visibility: hidden; }
   }
   /* 입장하기를 누르면: 색 번짐·글자·버튼은 옅어지며 사라지고, 로고는 본 화면 맨 위 로고 자리로 날아가 앉음.
      그동안 본 화면은 문장이 위에서부터 하나씩 올라오고, 아래 카테고리·검색 버튼이 톡 올라옴
@@ -377,16 +377,18 @@
   }
   /* 폰도 이제 같은 "흩어진 문장" 첫 화면(B안 시험 중). 예전 색 번짐 시작 화면은 숨겨 둠(코드는 남겨 둠 - 되돌리기 쉽게) */
   @media (pointer: coarse){
-    .intro-overlay{ display: block; cursor: default; }
+    .intro-overlay{ display: none; cursor: default; }
+    html.phone-scatter .intro-overlay{ display: block; }
     .splash-overlay{ display: none !important; }
     /* 머리글 로고(17px·700·간격 7px·점 8px)를 그대로 키운 비율 - 날아가 앉을 때 딱 겹치게 */
     .intro-center{ font-size: 38px; gap: 15.6px; letter-spacing: -0.42px; }
     .intro-center-dot{ width: 17.9px; height: 17.9px; transform: translateY(1px); }
     .intro-sub{ top: calc(50% + 32px); font-size: 13.5px; }
     .intro-hint{ bottom: max(44px, calc(env(safe-area-inset-bottom) + 28px)); font-size: 13px; }
-    .intro-layer.d1 .intro-frag{ font-size: 16px; }
-    .intro-layer.d2 .intro-frag{ font-size: 14px; }
-    .intro-layer.d3 .intro-frag{ font-size: 12.5px; }
+    /* 폰은 더 옅게 - 로고가 주인공이고 조각은 배경처럼 */
+    .intro-layer.d1 .intro-frag{ font-size: 15px; --base: 0.38; }
+    .intro-layer.d2 .intro-frag{ font-size: 13.5px; --base: 0.24; }
+    .intro-layer.d3 .intro-frag{ font-size: 12.5px; --base: 0.14; }
     .intro-frag{ gap: 8px; }
     .intro-frag-dot{ width: 6px; height: 6px; }
     .intro-frag-src{ left: 14px; font-size: 11px; }
@@ -616,6 +618,120 @@
   @keyframes introListIn{
     from{ opacity: 0; transform: translateY(24px); }
     to{ opacity: 1; transform: none; }
+  }
+
+
+  /* ── 폰 첫 화면 A: 오늘 다시 꺼낸 한 문장 ─────────────────────
+     목록 맨 위 "오랜만에 보는 문장" 카드와 같은 문장을 크게(그래도 21px까지만) 보여줌.
+     화면 아무 데나 누르면 로고는 머리글 자리로, 문장은 그 카드 자리로 내려앉으며 본 화면이 펼쳐짐.
+     긴 문장은 칠해 둔 부분 → 첫 문장 → 80자 근처에서 끊기 순서로 줄여서 어떤 문장이든 4줄 안에 들어옴. */
+  .pintro{
+    position: fixed;
+    inset: 0;
+    z-index: 520;
+    display: none;
+    background: var(--bg);
+    overflow: hidden;
+    -webkit-user-select: none;
+    user-select: none;
+    transition: background-color 0.45s ease-out;
+  }
+  @media (pointer: coarse){ .pintro{ display: block; } }
+  .pintro.gone{ display: none !important; }
+  .pintro-blob{
+    position: absolute;
+    border-radius: 50%;
+    filter: blur(60px);
+    opacity: 0.3;
+    pointer-events: none;
+    transition: opacity 0.45s ease-out;
+  }
+  .pintro-blob.a{ background: #FFAB91; width: 340px; height: 340px; left: -130px; top: -150px; }
+  .pintro-blob.b{ background: #7FD8F0; width: 300px; height: 300px; right: -150px; top: -100px; }
+  /* 머리글 로고와 똑같은 크기 - 날아갈 때 옮기기만 하면 딱 겹침 */
+  .pintro-wm{
+    position: absolute;
+    left: 28px;
+    top: max(58px, calc(env(safe-area-inset-top) + 18px));
+    display: flex;
+    align-items: center;
+    gap: 7px;
+    font-size: 17px;
+    font-weight: 700;
+    letter-spacing: -0.2px;
+    color: var(--text);
+    transition: transform 0.56s cubic-bezier(.65,0,.25,1);
+  }
+  .pintro-wm span:last-child{ line-height: 1; }
+  .pintro-wm-dot{
+    flex-shrink: 0;
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: #7FD8F0;
+    transform: translateY(0.5px);
+    transition: background-color 0.56s ease;
+  }
+  .pintro-main{
+    position: absolute;
+    left: 30px;
+    right: 30px;
+    top: 50%;
+    transform: translateY(-58%);
+    opacity: 0;
+    translate: 0 10px;
+    transition: opacity 0.7s cubic-bezier(.22,1,.36,1), translate 0.7s cubic-bezier(.22,1,.36,1);
+  }
+  .pintro.ready .pintro-main{ opacity: 1; translate: 0 0; }
+  .pintro-label{ font-size: 13.5px; font-weight: 700; color: var(--text-tertiary); margin-bottom: 20px; }
+  .pintro-q{
+    display: flex;
+    gap: 14px;
+    transform-origin: 0 0;
+  }
+  .pintro-bar{ width: 3px; border-radius: 2px; flex-shrink: 0; background: var(--c, #7FD8F0); }
+  .pintro-text{
+    font-size: 21px;
+    font-weight: 600;
+    line-height: 1.62;
+    letter-spacing: -0.5px;
+    color: var(--text);
+    text-wrap: pretty;
+    word-break: keep-all;
+    overflow-wrap: anywhere;
+  }
+  .pintro-text.mid{ font-size: 19px; }
+  .pintro-text.long{ font-size: 18px; }
+  .pintro-src{ font-size: 13.5px; font-weight: 500; color: var(--text-tertiary); margin: 18px 0 0 17px; }
+  .pintro-more{ font-size: 12px; font-weight: 500; color: #b0b0b5; margin: 6px 0 0 17px; }
+  .pintro-more:empty, .pintro-src:empty{ display: none; }
+  .pintro-count, .pintro-hint{
+    position: absolute;
+    left: 0;
+    right: 0;
+    text-align: center;
+    color: var(--text-tertiary);
+    opacity: 0;
+    transition: opacity 0.8s ease-out 0.3s;
+  }
+  .pintro-count{ bottom: max(84px, calc(env(safe-area-inset-bottom) + 66px)); font-size: 12.5px; font-weight: 500; color: #b8b8bd; }
+  .pintro-hint{ bottom: max(52px, calc(env(safe-area-inset-bottom) + 34px)); font-size: 13px; font-weight: 600; }
+  .pintro.ready .pintro-count, .pintro.ready .pintro-hint{ opacity: 1; }
+  /* 누르면: 배경·색 번짐·글자들은 걷히고, 문장 줄은 카드 자리로 옮겨 가며 옅어짐 */
+  .pintro.leaving{ background-color: transparent; pointer-events: none; }
+  .pintro.leaving .pintro-blob{ opacity: 0; }
+  .pintro.leaving .pintro-label, .pintro.leaving .pintro-src, .pintro.leaving .pintro-more{ opacity: 0; transition: opacity 0.2s ease-out; }
+  .pintro.leaving .pintro-count, .pintro.leaving .pintro-hint{ opacity: 0; transition: opacity 0.2s ease-out; }
+  .pintro.leaving .pintro-q{
+    transition: transform 0.56s cubic-bezier(.65,0,.25,1), opacity 0.3s ease-out 0.26s;
+    opacity: 0;
+  }
+  /* 카드는 문장 줄이 거의 도착할 즈음 나타나며 전체 문장을 보여줌 */
+  .quote-block.pintro-land{ animation: pintroLand 0.5s ease-out 0.3s both; }
+  @keyframes pintroLand{ from{ opacity: 0; } to{ opacity: 1; } }
+  @media (prefers-reduced-motion: reduce){
+    .pintro-main, .pintro-wm, .pintro.leaving .pintro-q{ transition: none; }
+    .quote-block.pintro-land{ animation: none; }
   }
 
   /* ── 보관함 (카테고리별 문장 목록) - 메인 화면 ──── */
@@ -1883,7 +1999,7 @@
     bottom: calc(100% + 10px);
     display: flex;
     justify-content: center; /* 입력줄 위 가운데, 좌우 여백 똑같이 */
-    gap: 8px;
+    gap: 12px;
     padding: 0 6px;
     pointer-events: none;
   }
@@ -1905,8 +2021,8 @@
     display: flex;
     align-items: center;
     gap: 7px;
-    height: 32px;
-    padding: 0 13px 0 11px;
+    height: 34px;
+    padding: 0 16px 0 13px;
     border: 0;
     border-radius: 999px;
     background: var(--surface);
@@ -1948,11 +2064,12 @@
     display: flex;
     flex-wrap: wrap;
     justify-content: center;
-    gap: 8px;
-    margin-top: 14px;
+    gap: 12px 10px;
+    margin-top: 20px;
   }
   .msearch-chips .search-chip{
-    height: 36px; /* 손가락으로 누르기 쉽게 - 바깥 여백까지 44px 남짓 */
+    height: 38px;
+    padding: 0 17px 0 14px; /* 손가락으로 누르기 쉽게 - 바깥 여백까지 44px 남짓 */
     opacity: 1;
     transform: none;
     pointer-events: auto;
@@ -2861,6 +2978,20 @@
   </div>
 </div>
 
+<!-- 폰 첫 화면 A: 오늘 다시 꺼낸 한 문장. 화면 아무 데나 누르면 들어감 -->
+<div class="pintro" id="pIntro" role="button" aria-label="오늘의 문장 - 눌러서 들어가기">
+  <span class="pintro-blob a"></span><span class="pintro-blob b"></span>
+  <div class="pintro-wm" id="pIntroWm"><span class="pintro-wm-dot" id="pIntroWmDot"></span><span>soooo.zip</span></div>
+  <div class="pintro-main" id="pIntroMain">
+    <div class="pintro-label" id="pIntroLabel"></div>
+    <div class="pintro-q" id="pIntroQ"><span class="pintro-bar"></span><div class="pintro-text" id="pIntroText"></div></div>
+    <div class="pintro-src" id="pIntroSrc"></div>
+    <div class="pintro-more" id="pIntroMore"></div>
+  </div>
+  <div class="pintro-count" id="pIntroCount"></div>
+  <div class="pintro-hint">화면을 눌러 들어가기</div>
+</div>
+
 <!-- PC 첫 화면 - 내가 모은 문장 조각들이 떠 있다가, 클릭하거나 아무 키나 누르면
      가운데로 모이며 검색 화면이 열림. 폰에서는 CSS가 감춰 둠(폰은 위의 "입장하기" 화면). -->
 <div class="intro-overlay" id="introOverlay" aria-label="soooo.zip 시작 화면">
@@ -3196,10 +3327,13 @@
 // 그대로 둠. 여기서 미리 감추는 이유는, 잠깐이라도 보였다 사라지면 깜빡여 보이기 때문.
 const SKIP_SPLASH = !window.matchMedia('(pointer: coarse)').matches;
 // 폰 첫 화면 방식: 'scatter' = PC와 같은 흩어진 문장(B안), 'splash' = 예전 색 번짐 화면
-const PHONE_INTRO_STYLE = 'scatter';
+// 폰 첫 화면 방식: 'single' = 오늘 다시 꺼낸 한 문장(A안), 'scatter' = 흩어진 문장(B안), 'splash' = 예전 색 번짐
+const PHONE_INTRO_STYLE = 'single';
 const USE_SCATTER_INTRO = SKIP_SPLASH || PHONE_INTRO_STYLE === 'scatter';
+const USE_SINGLE_INTRO = !SKIP_SPLASH && PHONE_INTRO_STYLE === 'single';
+if(!SKIP_SPLASH && PHONE_INTRO_STYLE === 'scatter') document.documentElement.classList.add('phone-scatter');
 (function hideSplashOnDesktop(){
-  if(!USE_SCATTER_INTRO) return;
+  if(!USE_SCATTER_INTRO && !USE_SINGLE_INTRO) return;
   const el = document.getElementById('splashOverlay');
   if(el) el.style.display = 'none';
 })();
@@ -6506,7 +6640,7 @@ function updateSearchChips(){
     // 입력줄 폭을 넘치면 뒤에서부터 뺌(두 줄로 넘어가거나 잘려 보이지 않게)
     // (scrollWidth는 뒤의 하얀 받침까지 재서 안 맞음 - 버튼 폭을 직접 더함)
     const max = searchChips.clientWidth - 12;
-    const used = () => [...searchChips.children].reduce((w, c) => w + c.offsetWidth + 8, -8);
+    const used = () => [...searchChips.children].reduce((w, c) => w + c.offsetWidth + 12, -12);
     if(max > 100) while(searchChips.children.length > 1 && used() > max) searchChips.lastElementChild.remove();
   }
   // 실제로 물어봤다가 돌아오면 새 예시로(글자 몇 개 쳤다 지운 정도로는 안 바꿈 - 자꾸 바뀌면 어수선함)
@@ -8458,6 +8592,115 @@ function pickSplashSub(quoteCount){
   return pool[Math.floor(rand() * pool.length)];
 }
 
+// ── 폰 첫 화면 A: 오늘 다시 꺼낸 한 문장 ─────────────────────────
+const pIntro = document.getElementById('pIntro');
+let pIntroOpen = USE_SINGLE_INTRO && !!pIntro;
+let pIntroSentenceId = null;
+if(pIntro && !USE_SINGLE_INTRO) pIntro.classList.add('gone');
+
+// 첫 화면에 보여줄 만큼만 - 칠해 둔 부분 → 첫 문장 → 80자 근처에서 끊기
+function phoneIntroExcerpt(s){
+  const text = (s.text || '').replace(/\s+/g, ' ').trim();
+  const raw = s.text || '';
+  const hs = (s.highlights || [])
+    .map(h => ({ t: raw.slice(h.start, h.end).replace(/\s+/g, ' ').trim(), atStart: h.start <= 1, atEnd: h.end >= raw.trim().length - 1 }))
+    .filter(h => h.t.length >= 8 && h.t.length <= 90);
+  if(hs.length){
+    const h = hs[0];
+    return { text: (h.atStart ? '' : '… ') + h.t + (h.atEnd || /[.!?…]$/.test(h.t) ? '' : ' …'), more: '칠해 둔 부분이에요 · 전체 문장은 안에서' };
+  }
+  const first = text.split(/(?<=[.!?…])\s/)[0];
+  if(first.length <= 90) return { text: first, more: first.length < text.length ? '이어지는 내용은 안에서' : '' };
+  let cut = first.slice(0, 80);
+  const sp = cut.lastIndexOf(' ');
+  if(sp > 50) cut = cut.slice(0, sp);
+  return { text: cut.replace(/[,.\s]+$/, '') + '…', more: '이어지는 내용은 안에서' };
+}
+
+function buildPhoneIntro(){
+  if(!pIntroOpen) return;
+  // 목록 맨 위 "오랜만에 보는 문장" 카드와 같은 문장 - 그래야 들어갈 때 그 자리로 내려앉는 게 자연스러움
+  const card = archiveList.querySelector('.quote-block.spotlight-card');
+  const s = card ? findSentence(card.dataset.id) : null;
+  const books = new Set(sentences.map(x => (x.source || '').trim()).filter(Boolean)).size;
+  document.getElementById('pIntroCount').textContent = sentences.length
+    ? (books ? `${books}권의 책에서 모은 ${sentences.length}개의 문장 중 하나` : `${sentences.length}개의 문장 중 하나`)
+    : '아직 모은 문장이 없어요';
+  if(s){
+    pIntroSentenceId = s.id;
+    const ex = phoneIntroExcerpt(s);
+    const t = document.getElementById('pIntroText');
+    t.textContent = ex.text;
+    t.classList.toggle('mid', ex.text.length > 40 && ex.text.length <= 65);
+    t.classList.toggle('long', ex.text.length > 65);
+    document.getElementById('pIntroLabel').textContent = (card.querySelector('.spotlight-label') || {}).textContent || '오랜만에 꺼낸 문장이에요';
+    document.getElementById('pIntroSrc').textContent = [s.source, s.ref].filter(x => (x || '').trim()).join(' · ');
+    document.getElementById('pIntroMore').textContent = ex.more;
+    document.getElementById('pIntroQ').style.setProperty('--c', getCategoryColor(s.category));
+  } else {
+    document.getElementById('pIntroMain').style.display = 'none';
+  }
+  requestAnimationFrame(() => pIntro.classList.add('ready'));
+}
+
+function leavePhoneIntro(){
+  if(!pIntroOpen) return;
+  pIntroOpen = false;
+  document.documentElement.classList.add('splash-done'); // 숨겨 둔 앱 화면을 다시 보이게
+  const reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  // ① 로고 → 머리글 로고 자리(크기가 같아서 옮기기만)
+  const head = document.getElementById('wordmark');
+  const hDot = head && head.querySelector('.wordmark-dot');
+  const wm = document.getElementById('pIntroWm');
+  let flew = false;
+  if(!reduce && hDot){
+    const a = hDot.getBoundingClientRect();
+    const d = document.getElementById('pIntroWmDot').getBoundingClientRect();
+    if(a.width){
+      head.style.opacity = '0';
+      document.getElementById('pIntroWmDot').style.backgroundColor = getComputedStyle(hDot).backgroundColor;
+      wm.style.transform = `translate(${(a.left - d.left).toFixed(1)}px, ${(a.top - d.top).toFixed(1)}px)`;
+      flew = true;
+    }
+  }
+  // ② 문장 줄 → 목록 맨 위 카드의 문장 자리(작아지며 옮겨 가다 옅어지고, 카드가 전체 문장으로 나타남)
+  const card = pIntroSentenceId ? archiveList.querySelector(`.quote-block.spotlight-card[data-id="${pIntroSentenceId}"]`) : null;
+  const q = document.getElementById('pIntroQ');
+  if(!reduce && card){
+    const target = card.querySelector('.quote-text').getBoundingClientRect();
+    const from = q.getBoundingClientRect();
+    const k = Math.min(1, target.width / from.width);
+    q.style.transform = `translate(${(target.left - from.left).toFixed(1)}px, ${(target.top - from.top).toFixed(1)}px) scale(${k.toFixed(3)})`;
+    card.classList.add('pintro-land');
+  }
+  pIntro.classList.add('leaving');
+  // ③ 나머지 문장은 위에서부터 하나씩, 아래 카테고리·검색 버튼은 톡
+  if(!reduce){
+    document.body.classList.add('splash-reveal');
+    let i = 0;
+    const vh = window.innerHeight;
+    archiveList.querySelectorAll('.quote-block').forEach(el => {
+      if(el === card || i >= 8) return;
+      const r = el.getBoundingClientRect();
+      if(r.bottom < 0 || r.top > vh) return;
+      el.style.setProperty('--i', i++ + 2); // 카드가 먼저 자리 잡고 그 아래가 이어서
+      el.classList.add('intro-in');
+    });
+  }
+  setTimeout(() => {
+    if(head) head.style.opacity = '';
+    pIntro.classList.add('gone');
+  }, flew ? 600 : 300);
+  setTimeout(() => {
+    document.body.classList.remove('splash-reveal');
+    archiveList.querySelectorAll('.quote-block.intro-in, .quote-block.pintro-land').forEach(el => el.classList.remove('intro-in', 'pintro-land'));
+  }, 1900);
+}
+if(pIntro){
+  pIntro.addEventListener('click', leavePhoneIntro);
+}
+
+// ── 폰 첫 화면 B는 여기 아래(PC 첫 화면과 같은 코드) ──
 // ── PC 첫 화면: 흩어진 문장이 모이기 ─────────────────────────
 // 문장 조각을 화면 곳곳에 흩뿌려 두고, 클릭이나 아무 키를 누르면 가운데 점으로 모으며 닫음.
 // 조각은 들어올 때마다 무작위로 다시 뽑아서, 열 때마다 다른 문장들이 떠 있음.
@@ -8507,7 +8750,7 @@ function buildIntroFragments(){
     [picks[i], picks[j]] = [picks[j], picks[i]];
   }
   const W = window.innerWidth, H = window.innerHeight;
-  const want = INTRO_TOUCH ? 9 : Math.max(8, Math.min(16, Math.round(W * H / 70000)));
+  const want = INTRO_TOUCH ? 5 : Math.max(8, Math.min(16, Math.round(W * H / 70000))); // 폰은 화면이 작아 5개만(많으면 복잡해 보임)
 
   // 1) 후보 조각을 한꺼번에 만들어 넣고(아직 안 보이게) → 2) 크기를 한 번에 잼 → 3) 자리 배치.
   //    하나 넣고 재고, 또 넣고 재고 하면 그때마다 화면 계산을 새로 해서 첫 순간이 버벅였음.
@@ -8541,7 +8784,7 @@ function buildIntroFragments(){
   const hint = introOverlay.querySelector('.intro-hint').getBoundingClientRect();
   const dot = document.getElementById('introCenterDot').getBoundingClientRect();
   // 폰은 화면이 좁아서 여백·간격을 줄이고, 칸도 가로 2 × 세로 8로 나눔
-  const EDGE = INTRO_TOUCH ? 18 : 40, PADX = INTRO_TOUCH ? 10 : 24, PADY = INTRO_TOUCH ? 12 : 18;
+  const EDGE = INTRO_TOUCH ? 22 : 40, PADX = INTRO_TOUCH ? 14 : 24, PADY = INTRO_TOUCH ? 22 : 18;
   const keepOut = [
     { l: center.left - (INTRO_TOUCH ? 16 : 70), t: center.top - (INTRO_TOUCH ? 36 : 60), r: center.right + (INTRO_TOUCH ? 16 : 70), b: center.bottom + (INTRO_TOUCH ? 30 : 60) },
     { l: W / 2 - 200, t: sub.top - 12, r: W / 2 + 200, b: sub.bottom + (INTRO_TOUCH ? 22 : 28) },
@@ -8637,7 +8880,7 @@ function startIntro(){
     const glow = document.getElementById('introGlow');
     let pending = null;
     introOverlay.addEventListener('mousemove', (e) => {
-      if(!introOpen) return;
+      if(!introOpen || INTRO_TOUCH) return; // 폰은 손가락이라 커서 빛·손전등 없음(대신 저절로 반짝임)
       const first = !pending;
       pending = [e.clientX, e.clientY];
       if(!first) return;
@@ -8852,6 +9095,12 @@ startIntro();
 startIntroTwinkle();
 
 loadAll().then(() => {
+  if(USE_SINGLE_INTRO){
+    splashDismissed = true;
+    const fontsReady = document.fonts && document.fonts.ready ? Promise.race([document.fonts.ready, new Promise(r => setTimeout(r, 800))]) : Promise.resolve();
+    fontsReady.then(buildPhoneIntro);
+    return;
+  }
   // PC는 시작 화면을 건너뛰므로, 숫자 세기·배경 만들기 같은 준비도 할 필요가 없음
   if(USE_SCATTER_INTRO){
     splashDismissed = true;
